@@ -1,0 +1,440 @@
+<?php
+require_once __DIR__ . '/includes/session_config.php';
+require_once 'classes/Database.php';
+
+if (!isset($_SESSION['user'])) {
+    header("location:login.php");
+    exit;
+}
+
+$db = new Database();
+$user = $_SESSION['user'];
+$role = strtolower($user['role_derived'] ?? 'anggota');
+$isAdmin = in_array($role, ['ketua', 'sekretaris']);
+
+// Filter Variables
+$filterAngkatan = $_GET['angkatan'] ?? '';
+$filterStatus = $_GET['status'] ?? '';
+$filterDivisi = $_GET['divisi'] ?? '';
+
+$whereClauses = ["p.tahun_selesai = (SELECT MAX(tahun_selesai) FROM periode)"];
+$queryParams = [];
+if ($filterAngkatan !== '') {
+    $whereClauses[] = "v.angkatan = ?";
+    $queryParams[] = $filterAngkatan;
+}
+if ($filterStatus !== '') {
+    $whereClauses[] = "v.status_keanggotaan = ?";
+    $queryParams[] = $filterStatus;
+}
+if ($filterDivisi !== '') {
+    if ($filterDivisi === 'Lintas Divisi') {
+        $whereClauses[] = "v.nama_divisi IS NULL";
+    } else {
+        $whereClauses[] = "v.nama_divisi = ?";
+        $queryParams[] = $filterDivisi;
+    }
+}
+$whereSQL = implode(" AND ", $whereClauses);
+
+// Ambil data anggota dari view v_anggota_lengkap, plus id_jabatan dan kode_pos
+$sql_anggota = "
+    SELECT v.*, a.kode_pos, a.no_telp, ap.id_jabatan, j.id_divisi,
+           r.role_level
+    FROM v_anggota_lengkap v
+    JOIN anggota a ON v.id_anggota = a.id_anggota
+    JOIN anggota_periode ap ON a.id_anggota = ap.id_anggota
+    JOIN periode p ON ap.id_periode = p.id_periode
+    LEFT JOIN jabatan j ON ap.id_jabatan = j.id_jabatan
+    LEFT JOIN role r ON j.id_role = r.id_role
+    WHERE $whereSQL
+    ORDER BY v.nama_lengkap ASC
+";
+$stmtAnggota = $db->pdo->prepare($sql_anggota);
+$stmtAnggota->execute($queryParams);
+$resAnggota = $stmtAnggota->fetchAll(PDO::FETCH_ASSOC);
+
+// Fetch data for filters
+$listAngkatan = $db->pdo->query("SELECT DISTINCT angkatan FROM anggota WHERE angkatan IS NOT NULL AND angkatan != '' ORDER BY angkatan DESC")->fetchAll(PDO::FETCH_ASSOC);
+$listDivisi = $db->pdo->query("SELECT * FROM divisi ORDER BY nama_divisi ASC")->fetchAll(PDO::FETCH_ASSOC);
+
+// Ambil data pendukung buat dropdown modal
+$jabatanList = $db->pdo->query("SELECT * FROM jabatan ORDER BY nama_jabatan ASC")->fetchAll(PDO::FETCH_ASSOC);
+$kodePosList = $db->pdo->query("SELECT * FROM kode_pos ORDER BY kecamatan ASC LIMIT 50")->fetchAll(PDO::FETCH_ASSOC);
+
+include 'partials/header.php';
+include 'partials/sidebar.php';
+?>
+
+<style>
+    /* MODAL STYLE */
+    .modal-overlay {
+        display: none;
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.85);
+        backdrop-filter: blur(10px);
+        z-index: 10005;
+        align-items: center;
+        justify-content: center;
+        padding: 20px;
+    }
+
+    .form-input {
+        width: 100%;
+        padding: 12px;
+        background: #1a1a1a !important;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 10px;
+        color: #ffffff !important;
+        margin-top: 5px;
+        outline: none;
+        color-scheme: dark;
+    }
+
+    .form-input option {
+        background: #1a1a1a;
+        color: #fff;
+    }
+
+    /* NEON GLOW STATUS */
+    .badge-neon {
+        padding: 5px 15px;
+        border-radius: 20px;
+        font-size: 10px;
+        font-weight: 900;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        display: inline-block;
+    }
+
+    /* Status Aktif - Hijau Neon */
+    .status-aktif {
+        color: #00FF66;
+        border: 1px solid #00FF66;
+        box-shadow: 0 0 10px rgba(0, 255, 102, 0.4), inset 0 0 5px rgba(0, 255, 102, 0.2);
+        text-shadow: 0 0 5px rgba(0, 255, 102, 0.6);
+    }
+
+    /* Status Alumni - Kuning/Orange Neon */
+    .status-alumni {
+        color: #facc15;
+        border: 1px solid #facc15;
+        box-shadow: 0 0 10px rgba(250, 204, 21, 0.4), inset 0 0 5px rgba(250, 204, 21, 0.2);
+        text-shadow: 0 0 5px rgba(250, 204, 21, 0.6);
+    }
+</style>
+
+<main class="main-content">
+    <?php include 'partials/navbar.php'; ?>
+
+    <div class="pt-6 px-4" style="display: flex; flex-direction: column; gap: 35px;">
+
+        <?php if (isset($_GET['msg'])): ?>
+            <?php
+            $msg = $_GET['msg'];
+            $isError = ($msg == 'error');
+            $bgColor = $isError ? 'rgba(255, 49, 49, 0.2)' : 'rgba(0, 255, 102, 0.2)';
+            $borderColor = $isError ? '#FF3131' : '#00FF66';
+            $textColor = $isError ? '#FF3131' : '#00FF66';
+            $text = '';
+            if ($msg == 'success')
+                $text = 'Data anggota berhasil ditambahkan!';
+            elseif ($msg == 'updated')
+                $text = 'Data anggota berhasil diperbarui!';
+            elseif ($msg == 'deleted')
+                $text = 'Data anggota berhasil dihapus!';
+            elseif ($msg == 'role_updated') {
+                $text = 'Role anggota berhasil diperbarui! Sesi pengguna tersebut telah diakhiri.';
+                $bgColor = 'rgba(0, 210, 255, 0.15)';
+                $borderColor = '#00d2ff';
+                $textColor = '#00d2ff';
+            } elseif ($msg == 'error')
+                $text = 'Terjadi Kesalahan: ' . htmlspecialchars($_GET['detail'] ?? 'Gagal memproses data.');
+            ?>
+            <div
+                style="background: <?= $bgColor ?>; border-left: 4px solid <?= $borderColor ?>; color: <?= $textColor ?>; padding: 15px; border-radius: 8px; font-weight: 600;">
+                <?= $text ?>
+            </div>
+        <?php endif; ?>
+
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+            <div>
+                <h2 class="text-2xl font-bold text-white">Database Anggota</h2>
+                <p style="color: var(--text-muted); font-size: 12px; margin-top: 5px;">Total Anggota Terdaftar:
+                    <?= count($resAnggota) ?></p>
+            </div>
+            <?php if ($isAdmin): ?>
+                <button onclick="toggleModal('addAnggotaModal')"
+                    style="background: #00d2ff; color: #000; font-weight: 800; padding: 12px 25px; border-radius: 12px; border:none; cursor:pointer;">+
+                    Anggota Baru</button>
+            <?php endif; ?>
+        </div>
+
+        <!-- FILTER FORM -->
+        <form method="GET" action="anggota.php" class="glass-card"
+            style="padding: 20px; display: flex; gap: 15px; align-items: center; flex-wrap: wrap;">
+            <div style="display: flex; flex-direction: column; gap: 5px; min-width: 150px; flex: 1;">
+                <label style="color: var(--text-muted); font-size: 12px; font-weight: 600;">ANGKATAN</label>
+                <select name="angkatan" class="form-input" style="padding: 10px;">
+                    <option value="">Semua Angkatan</option>
+                    <?php foreach ($listAngkatan as $angk): ?>
+                        <option value="<?= htmlspecialchars($angk['angkatan']) ?>" <?= ($filterAngkatan == $angk['angkatan']) ? 'selected' : '' ?>><?= htmlspecialchars($angk['angkatan']) ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 5px; min-width: 150px; flex: 1;">
+                <label style="color: var(--text-muted); font-size: 12px; font-weight: 600;">STATUS</label>
+                <select name="status" class="form-input" style="padding: 10px;">
+                    <option value="">Semua Status</option>
+                    <option value="Aktif" <?= ($filterStatus == 'Aktif') ? 'selected' : '' ?>>Aktif</option>
+                    <option value="Alumni" <?= ($filterStatus == 'Alumni') ? 'selected' : '' ?>>Alumni</option>
+                </select>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 5px; min-width: 150px; flex: 1;">
+                <label style="color: var(--text-muted); font-size: 12px; font-weight: 600;">DIVISI</label>
+                <select name="divisi" class="form-input" style="padding: 10px;">
+                    <option value="">Semua Divisi</option>
+                    <option value="Lintas Divisi" <?= ($filterDivisi == 'Lintas Divisi') ? 'selected' : '' ?>>Lintas Divisi
+                    </option>
+                    <?php foreach ($listDivisi as $div): ?>
+                        <option value="<?= htmlspecialchars($div['nama_divisi']) ?>" <?= ($filterDivisi == $div['nama_divisi']) ? 'selected' : '' ?>><?= htmlspecialchars($div['nama_divisi']) ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 5px; justify-content: flex-end; height: 100%;">
+                <label style="color: transparent; font-size: 12px;">ACTION</label>
+                <div style="display: flex; gap: 10px;">
+                    <button type="submit"
+                        style="background: #facc15; color: #000; padding: 10px 20px; border-radius: 8px; border:none; font-weight: 800; cursor:pointer;">Filter</button>
+                    <a href="anggota.php"
+                        style="background: rgba(255,255,255,0.1); color: #fff; padding: 10px 20px; border-radius: 8px; text-decoration:none; font-weight: 600;">Reset</a>
+                </div>
+            </div>
+        </form>
+
+        <div class="glass-card" style="padding: 0; overflow: hidden; border: 1px solid var(--glass-border);">
+            <table style="width: 100%; border-collapse: collapse; color: #fff;">
+                <thead>
+                    <tr
+                        style="text-align: left; background: rgba(255,255,255,0.02); border-bottom: 1px solid var(--glass-border);">
+                        <th style="padding: 20px; color: var(--text-muted); font-size: 11px;">IDENTITAS</th>
+                        <th style="padding: 20px; color: var(--text-muted); font-size: 11px;">JABATAN</th>
+                        <th style="padding: 20px; color: var(--text-muted); font-size: 11px; text-align: center;">STATUS
+                        </th>
+                        <th style="padding: 20px; color: var(--text-muted); font-size: 11px; text-align: right;">AKSI
+                        </th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php foreach ($resAnggota as $a): ?>
+                        <tr style="border-bottom: 1px solid rgba(255,255,255,0.03);">
+                            <td style="padding: 20px;">
+                                <div style="font-weight: 700;"><?= htmlspecialchars($a['nama_lengkap']) ?></div>
+                                <div style="font-size: 11px; color: var(--text-muted);"><?= htmlspecialchars($a['nim']) ?> |
+                                    <?= htmlspecialchars($a['angkatan']) ?></div>
+                            </td>
+                            <td style="padding: 20px;">
+                                <div style="color: #00d2ff; font-weight: 600; font-size: 13px;">
+                                    <?= htmlspecialchars($a['nama_jabatan'] ?? 'Anggota') ?></div>
+                            </td>
+                            <td style="padding: 20px; text-align: center;">
+                                <?php $stClass = ($a['status_keanggotaan'] == 'Aktif') ? 'status-aktif' : 'status-alumni'; ?>
+                                <span
+                                    class="badge-neon <?= $stClass ?>"><?= htmlspecialchars($a['status_keanggotaan']) ?></span>
+                            </td>
+                            <td style="padding: 20px; text-align: right;">
+                                <?php if ($isAdmin): ?>
+                                    <div style="display: flex; gap: 15px; justify-content: flex-end;">
+                                        <button onclick='openEditModal(<?= json_encode($a, JSON_HEX_APOS | JSON_HEX_QUOT) ?>)'
+                                            style="background:none; border:none; color:#facc15; cursor:pointer;">
+                                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                                stroke-width="2">
+                                                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                                                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                                            </svg>
+                                        </button>
+                                        <a href="admin/anggota_action.php?action=hapus&id=<?= $a['id_anggota'] ?>"
+                                            onclick="return confirm('Hapus anggota ini?')" style="color:#FF3131;">
+                                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                                stroke-width="2">
+                                                <polyline points="3 6 5 6 21 6" />
+                                                <path
+                                                    d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                                            </svg>
+                                        </a>
+                                    </div>
+                                <?php endif; ?>
+                            </td>
+                        </tr>
+                    <?php endforeach; ?>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</main>
+
+<!-- MODAL TAMBAH ANGGOTA -->
+<div id="addAnggotaModal" class="modal-overlay">
+    <div class="glass-card" style="max-width: 700px; width: 100%; max-height: 90vh; overflow-y: auto; padding: 30px;">
+        <h3 style="color:#fff; font-size: 1.5rem; font-weight: 800; margin-bottom: 25px;">Registrasi Anggota Baru</h3>
+        <form action="admin/anggota_action.php" method="POST">
+            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:20px;">
+                <input type="text" name="nim" placeholder="NIM (E412...)" class="form-input" required>
+                <input type="text" name="nama_lengkap" placeholder="Nama Lengkap" class="form-input" required>
+                <input type="email" name="email" placeholder="Email" class="form-input" required>
+                <input type="text" name="angkatan" placeholder="Angkatan (Contoh: 2025)" class="form-input">
+                <select name="role_input" class="form-input" required>
+                    <option value="">-- Pilih Role --</option>
+                    <option value="Ketua">Ketua</option>
+                    <option value="Sekretaris">Sekretaris</option>
+                    <option value="Bendahara">Bendahara</option>
+                    <option value="Anggota">Anggota</option>
+                </select>
+                <select name="id_divisi" class="form-input">
+                    <option value="">-- Divisi (Opsional) --</option>
+                    <?php foreach ($listDivisi as $div): ?>
+                        <option value="<?= $div['id_divisi'] ?>"><?= $div['nama_divisi'] ?></option>
+                    <?php endforeach; ?>
+                </select>
+                <select name="status_keanggotaan" class="form-input">
+                    <option value="Aktif">Aktif</option>
+                    <option value="Alumni">Alumni</option>
+                </select>
+                <div style="grid-column: span 2;">
+                    <select name="kode_pos" class="form-input" required>
+                        <?php foreach ($kodePosList as $kp): ?>
+                            <option value="<?= $kp['kode_pos'] ?>"><?= $kp['kode_pos'] ?> - <?= $kp['kecamatan'] ?>
+                                (<?= $kp['kelurahan'] ?>)</option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+            </div>
+            <div style="display:flex; gap:15px; margin-top:30px;">
+                <button type="submit" name="tambah_anggota"
+                    style="flex:1; background:#00d2ff; color:#000; padding:15px; border-radius:12px; border:none; font-weight:800; cursor:pointer;">SIMPAN
+                    DATA</button>
+                <button type="button" onclick="toggleModal('addAnggotaModal')"
+                    style="flex:1; background:rgba(255,255,255,0.05); color:#fff; padding:15px; border-radius:12px; border:none; cursor:pointer;">BATAL</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- MODAL EDIT ANGGOTA -->
+<div id="editAnggotaModal" class="modal-overlay">
+    <div class="glass-card" style="max-width: 700px; width: 100%; max-height: 90vh; overflow-y: auto; padding: 30px;">
+        <h3 style="color:#fff; font-size: 1.5rem; font-weight: 800; margin-bottom: 25px;">Edit Data Anggota</h3>
+        <form action="admin/anggota_action.php" method="POST">
+            <input type="hidden" name="id_anggota" id="edit_id_anggota">
+            <input type="hidden" name="jurusan" id="edit_jurusan">
+            <input type="hidden" name="program_studi" id="edit_program_studi">
+            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:20px;">
+                <input type="text" name="nim" id="edit_nim" placeholder="NIM (E412...)" class="form-input" required>
+                <input type="text" name="nama_lengkap" id="edit_nama_lengkap" placeholder="Nama Lengkap" class="form-input" required>
+                <input type="email" name="email" id="edit_email" placeholder="Email" class="form-input">
+                <input type="text" name="no_telp" id="edit_no_telp" placeholder="No. Telepon" class="form-input">
+                <input type="text" name="angkatan" id="edit_angkatan" placeholder="Angkatan (Contoh: 2025)" class="form-input">
+                <input type="hidden" name="role_input" id="edit_role_input_hidden">
+                <select id="edit_role_input" class="form-input" required
+                    onchange="document.getElementById('edit_role_input_hidden').value = this.value">
+                    <option value="">-- Pilih Role --</option>
+                    <option value="Ketua">Ketua</option>
+                    <option value="Sekretaris">Sekretaris</option>
+                    <option value="Bendahara">Bendahara</option>
+                    <option value="Anggota">Anggota</option>
+                </select>
+                <select name="id_divisi" id="edit_id_divisi" class="form-input">
+                    <option value="">-- Divisi (Opsional) --</option>
+                    <?php foreach ($listDivisi as $div): ?>
+                        <option value="<?= $div['id_divisi'] ?>"><?= $div['nama_divisi'] ?></option>
+                    <?php endforeach; ?>
+                </select>
+                <select name="status_keanggotaan" id="edit_status_keanggotaan" class="form-input">
+                    <option value="Aktif">Aktif</option>
+                    <option value="Alumni">Alumni</option>
+                </select>
+                <div style="grid-column: span 2;">
+                    <select name="kode_pos" id="edit_kode_pos" class="form-input" required>
+                        <option value="">Pilih Kode Pos</option>
+                        <?php foreach ($kodePosList as $kp): ?>
+                            <option value="<?= $kp['kode_pos'] ?>"><?= $kp['kode_pos'] ?> - <?= $kp['kecamatan'] ?>
+                                (<?= $kp['kelurahan'] ?>)</option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+            </div>
+            <div style="display:flex; gap:15px; margin-top:30px;">
+                <button type="submit" name="edit_anggota"
+                    style="flex:1; background:#facc15; color:#000; padding:15px; border-radius:12px; border:none; font-weight:800; cursor:pointer;">UPDATE
+                    DATA</button>
+                <button type="button" onclick="toggleModal('editAnggotaModal')"
+                    style="flex:1; background:rgba(255,255,255,0.05); color:#fff; padding:15px; border-radius:12px; border:none; cursor:pointer;">BATAL</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+    function toggleModal(id) {
+        const modal = document.getElementById(id);
+        modal.style.display = (modal.style.display === 'flex') ? 'none' : 'flex';
+    }
+
+    function openEditModal(data) {
+        document.getElementById('edit_id_anggota').value   = data.id_anggota;
+        document.getElementById('edit_nim').value          = data.nim;
+        document.getElementById('edit_nama_lengkap').value = data.nama_lengkap;
+        document.getElementById('edit_email').value        = data.email || '';
+        document.getElementById('edit_no_telp').value      = data.no_telp || '';
+        document.getElementById('edit_angkatan').value     = data.angkatan || '';
+        document.getElementById('edit_jurusan').value      = data.jurusan || '';
+        document.getElementById('edit_program_studi').value = data.program_studi || '';
+        document.getElementById('edit_kode_pos').value     = data.kode_pos || '';
+        document.getElementById('edit_id_divisi').value    = data.id_divisi || '';
+
+        // Tentukan role: cek role_level dari view, fallback ke nama_jabatan
+        const roleDerived = (data.role_level || '').toLowerCase();
+        let role = 'Anggota';
+        if (['ketua', 'sekretaris', 'bendahara'].includes(roleDerived)) {
+            role = roleDerived.charAt(0).toUpperCase() + roleDerived.slice(1);
+        } else if (['Ketua', 'Sekretaris', 'Bendahara'].includes(data.nama_jabatan)) {
+            role = data.nama_jabatan;
+        }
+        document.getElementById('edit_role_input').value = role;
+        document.getElementById('edit_role_input_hidden').value = role;
+
+        // Jika yang login sekretaris dan anggota yang diedit adalah ketua → lock dropdown
+        const editorRole = '<?= $role ?>';
+        const roleSelect = document.getElementById('edit_role_input');
+        if (editorRole === 'sekretaris' && role === 'Ketua') {
+            roleSelect.disabled = true;
+            roleSelect.style.opacity = '0.5';
+            roleSelect.style.cursor = 'not-allowed';
+        } else {
+            roleSelect.disabled = false;
+            roleSelect.style.opacity = '';
+            roleSelect.style.cursor = '';
+            // Sembunyikan opsi Ketua untuk sekretaris
+            for (let i = 0; i < roleSelect.options.length; i++) {
+                if (roleSelect.options[i].value === 'Ketua') {
+                    roleSelect.options[i].disabled = (editorRole === 'sekretaris');
+                    roleSelect.options[i].style.color = (editorRole === 'sekretaris') ? '#555' : '';
+                }
+            }
+        }
+
+        // Set status
+        const statusSelect = document.getElementById('edit_status_keanggotaan');
+        for (let i = 0; i < statusSelect.options.length; i++) {
+            if (statusSelect.options[i].value === data.status_keanggotaan) {
+                statusSelect.selectedIndex = i;
+                break;
+            }
+        }
+
+        toggleModal('editAnggotaModal');
+    }
+</script>
+
+<?php include 'partials/footer.php'; ?>
