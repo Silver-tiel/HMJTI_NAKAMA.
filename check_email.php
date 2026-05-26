@@ -25,7 +25,11 @@ $auth = new Auth($db->conn);
 $user = $auth->findByEmail($email);
 
 if ($user) {
-    echo json_encode(['exists' => true]);
+    if (strtolower($user['status_keanggotaan']) === 'alumni') {
+        echo json_encode(['exists' => false, 'message' => 'Akun Alumni tidak dapat digunakan untuk login.']);
+    } else {
+        echo json_encode(['exists' => true]);
+    }
 } else {
-    echo json_encode(['exists' => false, 'message' => 'Email tidak terdaftar di sistem']);
+    echo json_encode(['exists' => false, 'message' => 'Email tidak terdaftar di sistem.']);
 }

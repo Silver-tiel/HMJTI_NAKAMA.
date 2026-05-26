@@ -82,7 +82,7 @@ include 'partials/sidebar.php';
         width: 100%; padding: 5px 10px; background: #1a1a2e !important; 
         border: 1px solid rgba(255,255,255,0.12); border-radius: 8px;
         color: #fff !important; margin-top: 3px; outline: none;
-        font-size: 12px; transition: border-color 0.2s;
+        font-size: 16px; transition: border-color 0.2s;
         color-scheme: dark;
     }
     .form-input:focus { border-color: #00d2ff; }
@@ -96,7 +96,7 @@ include 'partials/sidebar.php';
     input[type="datetime-local"]::-webkit-calendar-picker-indicator {
         filter: invert(58%) sepia(91%) saturate(3015%) hue-rotate(162deg) brightness(101%) contrast(101%);
     }
-    .form-label { color: rgba(255,255,255,0.5); font-size: 11px; letter-spacing: 0.5px; text-transform: uppercase; }
+    .form-label { color: rgba(255,255,255,0.5); font-size: 16px; letter-spacing: 0.5px; text-transform: uppercase; }
 
     /* Status Card Selector */
     .status-cards { display: grid; grid-template-columns: repeat(3,1fr); gap: 10px; margin-top: 8px; }
@@ -105,7 +105,7 @@ include 'partials/sidebar.php';
         display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px;
         padding: 14px 10px; border-radius: 12px; cursor: pointer;
         border: 2px solid rgba(255,255,255,0.08); background: rgba(255,255,255,0.03);
-        font-size: 11px; font-weight: 800; letter-spacing: 1px; transition: all 0.2s;
+        font-size: 16px; font-weight: 800; letter-spacing: 1px; transition: all 0.2s;
         color: rgba(255,255,255,0.4);
     }
     .status-card label .dot { width: 10px; height: 10px; border-radius: 50%; background: currentColor; }
@@ -113,6 +113,18 @@ include 'partials/sidebar.php';
     .status-card.disetujui input:checked + label { border-color: #00FF66; color: #00FF66; background: rgba(0,255,102,0.1); }
     .status-card.ditolak   input:checked + label { border-color: #FF3131; color: #FF3131; background: rgba(255,49,49,0.1); }
     .status-card label:hover { border-color: rgba(255,255,255,0.2); color: rgba(255,255,255,0.7); }
+
+    .btn-lihat-surat {
+        color: #00d2ff; font-size: 16px; font-weight: 700;
+        padding: 5px 12px; border-radius: 8px;
+        border: 1px solid rgba(0,210,255,0.3);
+        background: rgba(0,210,255,0.07);
+        cursor: pointer;
+    }
+    .btn-lihat-surat:hover { background: rgba(0,210,255,0.15); }
+    
+    /* Animasi spinner loading untuk cek jadwal */
+    @keyframes spin { to { transform: rotate(360deg); } }
 </style>
 
 <main class="main-content">
@@ -128,12 +140,13 @@ include 'partials/sidebar.php';
                 $textColor = $isError ? '#FF3131' : '#00FF66';
                 $text = '';
                 if ($msg == 'success') $text = 'Booking berhasil diajukan!';
+                elseif ($msg == 'ruangan_added') $text = 'Ruangan berhasil ditambahkan!';
                 elseif ($msg == 'updated') $text = 'Status booking berhasil diperbarui!';
                 elseif ($msg == 'deleted') $text = 'Booking berhasil dihapus!';
                 elseif ($msg == 'ruangan_deleted') $text = 'Ruangan berhasil dihapus!';
                 elseif ($msg == 'error') $text = 'Gagal: ' . htmlspecialchars($_GET['detail'] ?? 'Terjadi kesalahan.');
             ?>
-            <div style="background: <?= $bgColor ?>; border-left: 4px solid <?= $borderColor ?>; color: <?= $textColor ?>; padding: 15px; border-radius: 8px; font-weight: 600; font-size: 14px;">
+            <div style="background: <?= $bgColor ?>; border-left: 4px solid <?= $borderColor ?>; color: <?= $textColor ?>; padding: 15px; border-radius: 8px; font-weight: 600; font-size: 16px;">
                 <?= $text ?>
             </div>
         <?php endif; ?>
@@ -141,17 +154,16 @@ include 'partials/sidebar.php';
         <div style="display: flex; flex-wrap: wrap; gap: 15px; justify-content: space-between; align-items: center;">
             <div>
                 <h2 class="text-2xl font-bold text-white">Peminjaman Ruangan</h2>
-                <p style="color: var(--text-muted); font-size: 12px; margin-top: 5px;">Data booking fasilitas HMJ TI Polije</p>
+                <p style="color: var(--text-muted); font-size: 16px; margin-top: 5px;">Data booking fasilitas HMJ TI Polije</p>
             </div>
             <?php if ($isKetuaSekretaris): ?>
                 <div style="display:flex; flex-wrap:wrap; gap:10px;">
                     <button onclick="toggleModal('addModal')" style="background: #00d2ff; color: #000; font-weight: 800; padding: 12px 25px; border-radius: 12px; border:none; cursor:pointer; box-shadow: 0 0 15px rgba(0, 210, 255, 0.3);">+ Booking Ruangan</button>
-                    <button onclick="toggleModal('ruanganModal')" style="background: #facc15; color: #000; font-weight: 800; padding: 12px 25px; border-radius: 12px; border:none; cursor:pointer; box-shadow: 0 0 15px rgba(250, 204, 21, 0.2);">+ Tambah/Edit Ruangan</button>
+                    <button onclick="toggleModal('ruanganModal')" style="background: #facc15; color: #000; font-weight: 800; padding: 12px 25px; border-radius: 12px; border:none; cursor:pointer; box-shadow: 0 0 15px rgba(250, 204, 21, 0.2);">+ Tambah Ruangan</button>
                 </div>
             <?php endif; ?>
         </div>
 
-        <!-- GRID RUANGAN -->
         <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 25px;">
                 <?php foreach($ruanganList as $r): ?>
                 <div class="glass-card" style="padding: 0; overflow: hidden; position: relative; border: 1px solid var(--glass-border);">
@@ -165,8 +177,8 @@ include 'partials/sidebar.php';
                         <?php endif; ?>
                         <?php if ($isKetuaSekretaris): ?>
                         <div style="position:absolute;top:10px;right:10px;display:flex;gap:6px;z-index:2;">
-                            <button onclick='editRuangan(<?= json_encode($r) ?>)' title="Edit Ruangan" style="background:#facc15;border:none;border-radius:8px;padding:6px 10px;font-size:13px;font-weight:700;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,0.12);color:#000;">✎ Edit</button>
-                            <a href="admin/ruangan_action.php?hapus_ruangan=<?= $r['id_ruangan'] ?>" onclick="return confirm('PERINGATAN: Yakin ingin menghapus ruangan \'<?= htmlspecialchars(addslashes($r['nama_ruangan'])) ?>\'?\n\nRuangan TIDAK BISA dihapus jika masih terdapat riwayat booking/peminjaman yang menggunakan ruangan ini.')" title="Hapus Ruangan" style="background:#FF3131;border:none;border-radius:8px;padding:6px 10px;font-size:13px;font-weight:700;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,0.12);color:#fff;text-decoration:none;display:flex;align-items:center;">✕ Hapus</a>
+                            <button onclick='editRuangan(<?= json_encode($r) ?>)' title="Edit Ruangan" style="background:#facc15;border:none;border-radius:8px;padding:6px 10px;font-size:20px;font-weight:700;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,0.12);color:#000;">✎ Edit</button>
+                            <a href="admin/ruangan_action.php?hapus_ruangan=<?= $r['id_ruangan'] ?>" onclick="return confirm('PERINGATAN: Yakin ingin menghapus ruangan \'<?= htmlspecialchars(addslashes($r['nama_ruangan'])) ?>\'?\n\nRuangan TIDAK BISA dihapus jika masih terdapat riwayat booking/peminjaman yang menggunakan ruangan ini.')" title="Hapus Ruangan" style="background:#FF3131;border:none;border-radius:8px;padding:6px 10px;font-size:20px;font-weight:700;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,0.12);color:#fff;text-decoration:none;display:flex;align-items:center;">✕ Hapus</a>
                         </div>
                         <?php endif; ?>
                     </div>
@@ -176,7 +188,7 @@ include 'partials/sidebar.php';
                             Kapasitas: <?= $r['kapasitas'] ?> Orang
                         </div>
                         <h3 style="font-weight: 800; color: #fff; font-size: 1.1rem; margin-bottom: 10px;"><?= strtoupper(htmlspecialchars($r['nama_ruangan'])) ?></h3>
-                        <div style="font-size: 11px; color: rgba(255,255,255,0.6); margin-bottom: 10px;">
+                        <div style="font-size: 16px; color: rgba(255,255,255,0.6); margin-bottom: 10px;">
                             Fasilitas: Kursi (<?= $r['kursi'] ?>), Meja (<?= $r['meja'] ?>)
                             <?php if($r['ac']) echo ", AC"; ?>
                             <?php if($r['papan_tulis']) echo ", Papan Tulis"; ?>
@@ -194,11 +206,11 @@ include 'partials/sidebar.php';
                 <table style="width: 100%; border-collapse: collapse; color: #fff;">
                     <thead style="background: rgba(255,255,255,0.03); text-align: left; border-bottom: 1px solid var(--glass-border);">
                         <tr>
-                            <th style="padding: 20px; font-size: 11px; color: var(--text-muted); letter-spacing: 1px;">RUANGAN</th>
-                            <th style="padding: 20px; font-size: 11px; color: var(--text-muted); letter-spacing: 1px;">PEMINJAM</th>
-                            <th style="padding: 20px; font-size: 11px; color: var(--text-muted); letter-spacing: 1px;">WAKTU</th>
-                            <th style="padding: 20px; font-size: 11px; color: var(--text-muted); letter-spacing: 1px; text-align: center;">STATUS</th>
-                            <th style="padding: 20px; font-size: 11px; color: var(--text-muted); letter-spacing: 1px; text-align: right;">AKSI</th>
+                            <th style="padding: 20px; font-size: 16px; color: var(--text-muted); letter-spacing: 1px;">RUANGAN</th>
+                            <th style="padding: 20px; font-size: 16px; color: var(--text-muted); letter-spacing: 1px;">PEMINJAM</th>
+                            <th style="padding: 20px; font-size: 16px; color: var(--text-muted); letter-spacing: 1px;">WAKTU</th>
+                            <th style="padding: 20px; font-size: 16px; color: var(--text-muted); letter-spacing: 1px; text-align: center;">STATUS</th>
+                            <th style="padding: 20px; font-size: 16px; color: var(--text-muted); letter-spacing: 1px; text-align: right;">AKSI</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -206,36 +218,41 @@ include 'partials/sidebar.php';
                         <tr style="border-bottom: 1px solid rgba(255,255,255,0.03); transition: 0.3s;">
                             <td style="padding: 20px;">
                                 <div style="font-weight: 700; color: #fff;"><?= $p['nama_ruangan'] ?></div>
-                                <div style="font-size: 10px; color: #00d2ff;"><?= $p['kode_peminjaman'] ?></div>
+                                <div style="font-size: 16px; color: #00d2ff;"><?= $p['kode_peminjaman'] ?></div>
                             </td>
                             <td style="padding: 20px;">
                                 <div style="font-weight: 600;"><?= $p['nama_peminjam'] ?></div>
-                                <div style="font-size: 10px; color: var(--text-muted);"><?= $p['keperluan'] ?></div>
+                                <div style="font-size: 16px; color: var(--text-muted);"><?= $p['keperluan'] ?></div>
                             </td>
                             <td style="padding: 20px;">
-                                <div style="font-size: 12px;">📅 <?= date('d M Y', strtotime($p['waktu_mulai'])) ?></div>
-                                <div style="font-size: 11px; color: var(--text-muted);">⏰ <?= date('H:i', strtotime($p['waktu_mulai'])) ?> - <?= date('H:i', strtotime($p['waktu_selesai'])) ?></div>
+                                <div style="font-size: 16px;">📅 <?= date('d M Y', strtotime($p['waktu_mulai'])) ?></div>
+                                <div style="font-size: 16px; color: var(--text-muted);">⏰ <?= date('H:i', strtotime($p['waktu_mulai'])) ?> - <?= date('H:i', strtotime($p['waktu_selesai'])) ?></div>
                             </td>
                             <td style="padding: 20px; text-align: center;">
                                 <?php 
                                 $st = $p['status'] ?? 'Menunggu';
                                 $color = $st == 'Disetujui' ? '#00FF66' : ($st == 'Ditolak' ? '#FF3131' : '#facc15');
                                 ?>
-                                <span style="font-size: 10px; font-weight: 800; border: 1px solid <?= $color ?>; color: <?= $color ?>; padding: 5px 12px; border-radius: 8px;">
+                                <span style="font-size: 16px; font-weight: 800; border: 1px solid <?= $color ?>; color: <?= $color ?>; padding: 5px 12px; border-radius: 8px;">
                                     <?= strtoupper($st) ?>
                                 </span>
                             </td>
                             <td style="padding: 20px; text-align: right;">
+                                <div style="display: flex; gap: 15px; justify-content: flex-end; align-items:center;">
+                                    <?php if(!empty($p['surat_peminjaman'])): ?>
+                                        <button type="button" class="btn-lihat-surat" onclick='openPreviewModal(<?= htmlspecialchars(json_encode($p), ENT_QUOTES, 'UTF-8') ?>)'>
+                                            👁 Lihat Surat
+                                        </button>
+                                    <?php endif; ?>
                                 <?php if($isKetuaSekretaris): ?>
-                                    <div style="display: flex; gap: 15px; justify-content: flex-end;">
-                                        <button onclick="openEditModal(<?= htmlspecialchars(json_encode($p)) ?>)" style="background:none; border:none; color:rgba(255,255,255,0.3); cursor:pointer; transition:0.3s;" onmouseover="this.style.color='#facc15'">
+                                        <button onclick='openEditModal(<?= htmlspecialchars(json_encode($p), ENT_QUOTES, 'UTF-8') ?>)' style="background:none; border:none; color:rgba(255,255,255,0.3); cursor:pointer; transition:0.3s;" onmouseover="this.style.color='#facc15'">
                                             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
                                         </button>
                                         <a href="admin/peminjaman_action.php?action=hapus&id=<?= $p['id_peminjaman'] ?>" onclick="return confirm('Yakin hapus?')" style="color:rgba(255,255,255,0.3); transition:0.3s;" onmouseover="this.style.color='#FF3131'">
                                             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
                                         </a>
-                                    </div>
                                 <?php endif; ?>
+                                </div>
                             </td>
                         </tr>
                         <?php endwhile; else: ?>
@@ -252,48 +269,83 @@ include 'partials/sidebar.php';
     <div class="glass-card modal-content" style="padding: 22px 24px;">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:18px;">
             <h3 style="color:#fff; font-size: 1.1rem; font-weight: 800; margin:0;">Booking Ruangan Baru</h3>
-            <button onclick="toggleModal('addModal')" style="background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.1); color:#fff; width:30px; height:30px; border-radius:8px; cursor:pointer; font-size:15px; display:flex; align-items:center; justify-content:center;">✕</button>
+            <button onclick="toggleModal('addModal')" style="background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.1); color:#fff; width:30px; height:30px; border-radius:8px; cursor:pointer; font-size:20px; display:flex; align-items:center; justify-content:center;">✕</button>
         </div>
         <form action="admin/peminjaman_action.php" method="POST" enctype="multipart/form-data">
             <div style="display:flex; flex-direction:column; gap:8px;">
                 <div class="form-group">
-                    <label style="color:var(--text-muted); font-size:12px;">Pilih Ruangan</label>
-                    <select name="id_ruangan" class="form-input">
+                    <label style="color:var(--text-muted); font-size:20px;">Pilih Ruangan</label>
+                    <select name="id_ruangan" class="form-input" id="sel_ruangan">
                         <?php foreach($ruanganDropList as $rd): ?>
                             <option value="<?= $rd['id_ruangan'] ?>"><?= htmlspecialchars($rd['nama_ruangan']) ?></option>
                         <?php endforeach; ?>
                     </select>
                 </div>
                 <div class="form-group">
-                    <label style="color:var(--text-muted); font-size:12px;">Nama Peminjam</label>
+                    <label style="color:var(--text-muted); font-size:20px;">Nama Peminjam</label>
                     <input type="text" name="nama_peminjam" value="<?= $user['nama_lengkap'] ?>" class="form-input" required>
                 </div>
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
                     <div class="form-group">
-                        <label style="color:var(--text-muted); font-size:11px;">Waktu Mulai</label>
-                        <input type="datetime-local" name="waktu_mulai" class="form-input" required>
+                        <label style="color:var(--text-muted); font-size:20px;">Waktu Mulai</label>
+                        <input type="datetime-local" name="waktu_mulai" class="form-input" id="inp_mulai" min="<?= date('Y-m-d\T00:00', strtotime('tomorrow')) ?>" required>
                     </div>
                     <div class="form-group">
-                        <label style="color:var(--text-muted); font-size:11px;">Waktu Selesai</label>
-                        <input type="datetime-local" name="waktu_selesai" class="form-input" required>
+                        <label style="color:var(--text-muted); font-size:20px;">Waktu Selesai</label>
+                        <input type="datetime-local" name="waktu_selesai" class="form-input" id="inp_selesai" min="<?= date('Y-m-d\T00:00', strtotime('tomorrow')) ?>" required>
                     </div>
                 </div>
+                
+                <div id="konflik_alert" style="display:none; margin-top:8px;"></div>
+                
                 <div class="form-group">
-                    <label style="color:var(--text-muted); font-size:11px;">Keperluan</label>
+                    <label style="color:var(--text-muted); font-size:20px;">Keperluan</label>
                     <textarea name="keperluan" rows="2" placeholder="Contoh: Rapat Koordinasi Panitia" class="form-input" required></textarea>
                 </div>
                 <div class="form-group">
-                    <label style="color:var(--text-muted); font-size:11px;">Surat Peminjaman <span style="color:#FF3131;">*</span> <span style="color:rgba(255,255,255,0.3);">(PDF/Word)</span></label>
+                    <label style="color:var(--text-muted); font-size:20px;">Surat Peminjaman <span style="color:#FF3131;">*</span> <span style="color:rgba(255,255,255,0.3);">(PDF/Word)</span></label>
                     <input type="file" name="surat_peminjaman" class="form-input" 
                            accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
                            style="padding:8px 12px; cursor:pointer;" required>
                 </div>
                 <div style="display:flex; gap:10px; margin-top:4px;">
-                    <button type="submit" name="tambah_peminjaman" style="flex:1; background:#00d2ff; color:#000; padding:11px; border-radius:10px; border:none; font-weight:800; cursor:pointer; font-size:13px;">AJUKAN PINJAMAN</button>
-                    <button type="button" onclick="toggleModal('addModal')" style="flex:1; background:rgba(255,255,255,0.05); color:rgba(255,255,255,0.6); padding:11px; border-radius:10px; border:1px solid rgba(255,255,255,0.08); cursor:pointer; font-size:13px;">BATAL</button>
+                    <button type="submit" name="tambah_peminjaman" id="btn_ajukan" style="flex:1; background:#00d2ff; color:#000; padding:11px; border-radius:10px; border:none; font-weight:800; cursor:pointer; font-size:20px;">AJUKAN PINJAMAN</button>
+                    <button type="button" onclick="toggleModal('addModal')" style="flex:1; background:rgba(255,255,255,0.05); color:rgba(255,255,255,0.6); padding:11px; border-radius:10px; border:1px solid rgba(255,255,255,0.08); cursor:pointer; font-size:20px;">BATAL</button>
                 </div>
             </div>
         </form>
+    </div>
+</div>
+
+<div id="previewSuratModal" class="modal-overlay" style="z-index:10010;">
+    <div class="glass-card" style="max-width:820px; width:100%; padding:0; display:flex; flex-direction:column; max-height:90vh; border:1px solid rgba(0,210,255,0.2);">
+        <div style="display:flex; justify-content:space-between; align-items:center; padding:18px 24px; border-bottom:1px solid rgba(255,255,255,0.07);">
+            <div>
+                <h3 style="color:#fff; font-size:1.1rem; font-weight:800; margin:0;" id="preview_judul">Preview Surat</h3>
+                <div id="preview_meta" style="font-size:20px; color:#00d2ff; margin-top:4px;"></div>
+            </div>
+            <button onclick="tutupPreview()" style="background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.1); color:#fff; width:32px; height:32px; border-radius:8px; cursor:pointer; font-size:20px;">✕</button>
+        </div>
+
+        <div id="preview_info_card" style="margin:16px 24px 0; padding:12px 16px; background:rgba(0,210,255,0.05); border:1px solid rgba(0,210,255,0.15); border-radius:10px; display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px; font-size:20px; color:rgba(255,255,255,0.7);"></div>
+
+        <div style="flex:1; overflow:auto; margin:16px 24px; border-radius:10px; border:1px solid rgba(255,255,255,0.08); background:#111; min-height:400px; display:flex; align-items:center; justify-content:center; position:relative;">
+            <div id="preview_loading" style="color:rgba(255,255,255,0.3); text-align:center;">
+                <div style="font-size:32px; margin-bottom:10px;">📄</div>
+                <div>Memuat dokumen...</div>
+            </div>
+            <iframe id="preview_iframe" style="position:absolute; top:0; left:0; width:100%; height:100%; min-height:400px; border:none; border-radius:10px; display:none;"></iframe>
+            <div id="preview_fallback" style="display:none; text-align:center; padding:40px;">
+                <div style="font-size:48px; margin-bottom:16px;">📋</div>
+                <div style="color:#fff; font-weight:700; margin-bottom:8px;" id="preview_fallback_nama"></div>
+                <div style="color:rgba(255,255,255,0.4); font-size:20px; margin-bottom:20px;">Format file ini tidak dapat ditampilkan langsung di browser.</div>
+                <div id="preview_fallback_btns"></div>
+            </div>
+        </div>
+
+        <div style="padding:14px 24px; border-top:1px solid rgba(255,255,255,0.07); display:flex; justify-content:flex-end; gap:10px; align-items:center;">
+            <button onclick="tutupPreview()" style="background:rgba(255,255,255,0.05); color:rgba(255,255,255,0.6); padding:10px 20px; border-radius:10px; border:1px solid rgba(255,255,255,0.08); cursor:pointer; font-size:20px;">TUTUP</button>
+        </div>
     </div>
 </div>
 
@@ -301,15 +353,13 @@ include 'partials/sidebar.php';
     <div class="glass-card modal-content" style="padding: 22px 24px;">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
             <h3 style="color:#fff; font-size: 1.3rem; font-weight: 800; margin:0;">Update Status Booking</h3>
-            <button onclick="toggleModal('editModal')" style="background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.1); color:#fff; width:34px; height:34px; border-radius:8px; cursor:pointer; font-size:16px; display:flex; align-items:center; justify-content:center;">✕</button>
+            <button onclick="toggleModal('editModal')" style="background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.1); color:#fff; width:34px; height:34px; border-radius:8px; cursor:pointer; font-size:20px; display:flex; align-items:center; justify-content:center;">✕</button>
         </div>
         <form action="admin/peminjaman_action.php" method="POST">
             <input type="hidden" name="id_peminjaman" id="edit_id">
             <div style="display:flex; flex-direction:column; gap:14px;">
-                <!-- Info Card -->
-                <div id="edit_info" style="background: rgba(0,210,255,0.05); padding: 12px 14px; border-radius: 10px; border: 1px solid rgba(0,210,255,0.15); font-size: 12px; line-height: 1.7;"></div>
+                <div id="edit_info" style="background: rgba(0,210,255,0.05); padding: 12px 14px; border-radius: 10px; border: 1px solid rgba(0,210,255,0.15); font-size: 16px; line-height: 1.7;"></div>
 
-                <!-- Status Selector -->
                 <div>
                     <div class="form-label" style="margin-bottom:4px;">Pilih Status</div>
                     <div class="status-cards">
@@ -338,67 +388,14 @@ include 'partials/sidebar.php';
                 </div>
 
                 <div style="display:flex; gap:12px; margin-top:8px;">
-                    <button type="submit" name="edit_peminjaman" style="flex:1; background: linear-gradient(135deg,#facc15,#f59e0b); color:#000; padding:14px; border-radius:12px; border:none; font-weight:800; cursor:pointer; font-size:14px; letter-spacing:1px;">UPDATE DATA</button>
-                    <button type="button" onclick="toggleModal('editModal')" style="flex:1; background:rgba(255,255,255,0.05); color:rgba(255,255,255,0.6); padding:14px; border-radius:12px; border:1px solid rgba(255,255,255,0.08); cursor:pointer; font-size:14px;">BATAL</button>
+                    <button type="submit" name="edit_peminjaman" style="flex:1; background: linear-gradient(135deg,#facc15,#f59e0b); color:#000; padding:14px; border-radius:12px; border:none; font-weight:800; cursor:pointer; font-size:20px; letter-spacing:1px;">UPDATE DATA</button>
+                    <button type="button" onclick="toggleModal('editModal')" style="flex:1; background:rgba(255,255,255,0.05); color:rgba(255,255,255,0.6); padding:14px; border-radius:12px; border:1px solid rgba(255,255,255,0.08); cursor:pointer; font-size:20px;">BATAL</button>
                 </div>
             </div>
         </form>
     </div>
 </div>
 
-<script>
-    function toggleModal(id) {
-        const modal = document.getElementById(id);
-        modal.style.display = (modal.style.display === 'flex') ? 'none' : 'flex';
-        document.body.style.overflow = (modal.style.display === 'flex') ? 'hidden' : 'auto';
-    }
-
-    function openEditModal(data) {
-        document.getElementById('edit_id').value = data.id_peminjaman;
-
-        // Set radio button sesuai status saat ini
-        const radios = document.querySelectorAll('input[name="status"]');
-        radios.forEach(r => r.checked = (r.value === data.status));
-
-        // Format tanggal
-        const mulai = new Date(data.waktu_mulai);
-        const selesai = new Date(data.waktu_selesai);
-        const fmt = (d) => d.toLocaleDateString('id-ID', {day:'2-digit', month:'short', year:'numeric'});
-        const fmtTime = (d) => d.toLocaleTimeString('id-ID', {hour:'2-digit', minute:'2-digit'});
-
-        document.getElementById('edit_info').innerHTML = `
-            <div style="display:flex; gap:12px; align-items:center;">
-                <div style="width:42px;height:42px;border-radius:10px;background:rgba(0,210,255,0.1);border:1px solid rgba(0,210,255,0.2);display:flex;align-items:center;justify-content:center;font-size:20px;">🏫</div>
-                <div>
-                    <div style="font-weight:700;color:#fff;font-size:15px;">${data.nama_ruangan}</div>
-                    <div style="font-size:11px;color:#00d2ff;margin-top:2px;">Peminjam: <b>${data.nama_peminjam}</b></div>
-                </div>
-            </div>
-            <div style="margin-top:12px;padding-top:12px;border-top:1px solid rgba(255,255,255,0.07);display:grid;grid-template-columns:1fr 1fr;gap:8px;">
-                <div style="font-size:11px;color:rgba(255,255,255,0.4);">MULAI</div>
-                <div style="font-size:11px;color:rgba(255,255,255,0.4);">SELESAI</div>
-                <div style="color:#fff;font-size:13px;font-weight:600;">📅 ${fmt(mulai)} ${fmtTime(mulai)}</div>
-                <div style="color:#fff;font-size:13px;font-weight:600;">📅 ${fmt(selesai)} ${fmtTime(selesai)}</div>
-            </div>
-            <div style="margin-top:10px;font-size:12px;color:rgba(255,255,255,0.5);">📋 ${data.keperluan || '-'}</div>
-            ${data.surat_peminjaman 
-                ? `<div style="margin-top:10px;padding-top:10px;border-top:1px solid rgba(255,255,255,0.07);">
-                    <a href="view_document.php?path=${data.surat_peminjaman}" target="_blank" 
-                       style="display:inline-flex;align-items:center;gap:6px;background:rgba(0,210,255,0.1);border:1px solid rgba(0,210,255,0.25);color:#00d2ff;padding:6px 14px;border-radius:8px;font-size:12px;font-weight:700;text-decoration:none;transition:0.2s;"
-                       onmouseover="this.style.background='rgba(0,210,255,0.2)'" onmouseout="this.style.background='rgba(0,210,255,0.1)'">
-                        📄 Lihat Surat Peminjaman
-                    </a>
-                  </div>`
-                : `<div style="margin-top:10px;padding-top:10px;border-top:1px solid rgba(255,255,255,0.07);font-size:11px;color:rgba(255,255,255,0.25);">📎 Tidak ada surat dilampirkan</div>`
-            }
-        `;
-        toggleModal('editModal');
-    }
-</script>
-
-<?php include 'partials/footer.php'; ?>
-
-<!-- Modal Tambah/Edit Ruangan -->
 <div id="ruanganModal" class="modal-overlay">
     <div class="glass-card modal-content" style="padding: 22px 24px; max-width: 520px;">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:18px;">
@@ -436,8 +433,8 @@ include 'partials/sidebar.php';
                     <input type="file" name="foto" id="foto" class="form-input" accept=".jpg,.jpeg,.png,.webp" required>
                 </div>
                 <div style="display:flex; gap:10px; margin-top:4px;">
-                    <button type="submit" name="tambah_ruangan" style="flex:1; background:#facc15; color:#000; padding:11px; border-radius:10px; border:none; font-weight:800; cursor:pointer; font-size:13px;">SIMPAN</button>
-                    <button type="button" onclick="toggleModal('ruanganModal')" style="flex:1; background:rgba(255,255,255,0.05); color:rgba(255,255,255,0.6); padding:11px; border-radius:10px; border:1px solid rgba(255,255,255,0.08); cursor:pointer; font-size:13px;">BATAL</button>
+                    <button type="submit" name="tambah_ruangan" style="flex:1; background:#facc15; color:#000; padding:11px; border-radius:10px; border:none; font-weight:800; cursor:pointer; font-size:20px;">SIMPAN</button>
+                    <button type="button" onclick="toggleModal('ruanganModal')" style="flex:1; background:rgba(255,255,255,0.05); color:rgba(255,255,255,0.6); padding:11px; border-radius:10px; border:1px solid rgba(255,255,255,0.08); cursor:pointer; font-size:20px;">BATAL</button>
                 </div>
             </div>
         </form>
@@ -445,40 +442,280 @@ include 'partials/sidebar.php';
 </div>
 
 <script>
-function editRuangan(data) {
-    // Buka modal
-    toggleModal('ruanganModal');
-    // Isi form
-    document.getElementById('edit_id_ruangan').value = data.id_ruangan || '';
-    document.getElementById('nama_ruangan').value = data.nama_ruangan || '';
-    document.getElementById('kapasitas').value = data.kapasitas || '';
-    document.getElementById('kursi').value = data.kursi || '';
-    document.getElementById('meja').value = data.meja || '';
-    document.getElementById('ac').checked = data.ac == 1;
-    document.getElementById('papan_tulis').checked = data.papan_tulis == 1;
-    document.getElementById('proyektor').checked = data.proyektor == 1;
-    // document.getElementById('deskripsi').value = data.deskripsi || '';
-    // Foto tidak diisi (karena file input tidak bisa di-set value)
-}
-
-// Reset form saat modal ditutup
-document.getElementById('ruanganModal').addEventListener('click', function(e) {
-    if (e.target === this) {
-        resetRuanganForm();
+    // FUNGSI UMUM MODAL DLL
+    function toggleModal(id) {
+        const modal = document.getElementById(id);
+        modal.style.display = (modal.style.display === 'flex') ? 'none' : 'flex';
+        document.body.style.overflow = (modal.style.display === 'flex') ? 'hidden' : 'auto';
     }
-});
-function resetRuanganForm() {
-    document.getElementById('edit_id_ruangan').value = '';
-    document.getElementById('nama_ruangan').value = '';
-    document.getElementById('kapasitas').value = '';
-    document.getElementById('kursi').value = '';
-    document.getElementById('meja').value = '';
-    document.getElementById('ac').checked = false;
-    document.getElementById('papan_tulis').checked = false;
-    document.getElementById('proyektor').checked = false;
-    // document.getElementById('deskripsi').value = '';
-}
+
+    function openEditModal(data) {
+        document.getElementById('edit_id').value = data.id_peminjaman;
+        const radios = document.querySelectorAll('input[name="status"]');
+        radios.forEach(r => r.checked = (r.value === data.status));
+        const mulai = new Date(data.waktu_mulai);
+        const selesai = new Date(data.waktu_selesai);
+        const fmt = (d) => d.toLocaleDateString('id-ID', {day:'2-digit', month:'short', year:'numeric'});
+        const fmtTime = (d) => d.toLocaleTimeString('id-ID', {hour:'2-digit', minute:'2-digit'});
+
+        document.getElementById('edit_info').innerHTML = `
+            <div style="display:flex; gap:12px; align-items:center;">
+                <div style="width:42px;height:42px;border-radius:10px;background:rgba(0,210,255,0.1);border:1px solid rgba(0,210,255,0.2);display:flex;align-items:center;justify-content:center;font-size:20px;">🏫</div>
+                <div>
+                    <div style="font-weight:700;color:#fff;font-size:15px;">${data.nama_ruangan}</div>
+                    <div style="font-size:20px;color:#00d2ff;margin-top:2px;">Peminjam: <b>${data.nama_peminjam}</b></div>
+                </div>
+            </div>
+            <div style="margin-top:12px;padding-top:12px;border-top:1px solid rgba(255,255,255,0.07);display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+                <div style="font-size:20px;color:rgba(255,255,255,0.4);">MULAI</div>
+                <div style="font-size:20px;color:rgba(255,255,255,0.4);">SELESAI</div>
+                <div style="color:#fff;font-size:20px;font-weight:600;">📅 ${fmt(mulai)} ${fmtTime(mulai)}</div>
+                <div style="color:#fff;font-size:20px;font-weight:600;">📅 ${fmt(selesai)} ${fmtTime(selesai)}</div>
+            </div>
+            <div style="margin-top:10px;font-size:20px;color:rgba(255,255,255,0.5);">📋 ${data.keperluan || '-'}</div>
+            ${data.surat_peminjaman 
+                ? `<div style="margin-top:10px;padding-top:10px;border-top:1px solid rgba(255,255,255,0.07);">
+                    <button type="button" onclick='openPreviewModal(${JSON.stringify(data).replace(/'/g, "\\'")})' 
+                       style="display:inline-flex;align-items:center;gap:6px;background:rgba(0,210,255,0.1);border:1px solid rgba(0,210,255,0.25);color:#00d2ff;padding:6px 14px;border-radius:8px;font-size:20px;font-weight:700;cursor:pointer;transition:0.2s;"
+                       onmouseover="this.style.background='rgba(0,210,255,0.2)'" onmouseout="this.style.background='rgba(0,210,255,0.1)'">
+                        📄 Lihat Surat Peminjaman
+                    </button>
+                  </div>`
+                : `<div style="margin-top:10px;padding-top:10px;border-top:1px solid rgba(255,255,255,0.07);font-size:20px;color:rgba(255,255,255,0.25);">📎 Tidak ada surat dilampirkan</div>`
+            }
+        `;
+        toggleModal('editModal');
+    }
+
+    function tutupPreview() {
+        const modal = document.getElementById('previewSuratModal');
+        modal.style.display = 'none';
+        if (document.getElementById('editModal').style.display !== 'flex' && document.getElementById('addModal').style.display !== 'flex' && document.getElementById('ruanganModal').style.display !== 'flex') {
+            document.body.style.overflow = 'auto';
+        }
+        const iframe = document.getElementById('preview_iframe');
+        iframe.src = 'about:blank';
+        iframe.style.display = 'none';
+        document.getElementById('preview_loading').style.display = 'flex';
+        document.getElementById('preview_fallback').style.display = 'none';
+    }
+
+    function openPreviewModal(data) {
+        document.getElementById('preview_judul').textContent = data.keperluan || 'Preview Surat Peminjaman';
+        document.getElementById('preview_meta').textContent  = 'Oleh: ' + data.nama_peminjam + '  |  Kode: ' + data.kode_peminjaman;
+        const mulai = data.waktu_mulai ? new Date(data.waktu_mulai).toLocaleDateString('id-ID', {day:'2-digit', month:'short', year:'numeric'}) : '-';
+        document.getElementById('preview_info_card').innerHTML = `
+            <div>
+                <div style="color:rgba(255,255,255,0.35);font-size:20px;margin-bottom:3px;">PEMINJAM</div>
+                <div style="color:#fff;font-weight:600;">${data.nama_peminjam}</div>
+            </div>
+            <div>
+                <div style="color:rgba(255,255,255,0.35);font-size:20px;margin-bottom:3px;">TANGGAL MULAI</div>
+                <div style="color:#fff;font-weight:600;">${mulai}</div>
+            </div>
+            <div>
+                <div style="color:rgba(255,255,255,0.35);font-size:20px;margin-bottom:3px;">RUANGAN</div>
+                <div style="color:#fff;font-weight:600;">${data.nama_ruangan}</div>
+            </div>
+        `;
+        const modal = document.getElementById('previewSuratModal');
+        modal.style.display = 'flex';
+        document.body.style.overflow = 'hidden';
+        const iframe = document.getElementById('preview_iframe');
+        iframe.style.display = 'none';
+        document.getElementById('preview_loading').style.display = 'flex';
+        document.getElementById('preview_fallback').style.display = 'none';
+
+        if (!data.surat_peminjaman) {
+            document.getElementById('preview_loading').style.display = 'none';
+            tampilFallback('Tidak ada file dilampirkan.', null);
+            return;
+        }
+        const ext = data.surat_peminjaman.split('.').pop().toLowerCase();
+        if (['pdf', 'doc', 'docx'].includes(ext)) {
+            iframe.onload = function() {
+                document.getElementById('preview_loading').style.display = 'none';
+                iframe.style.display = 'block';
+            };
+            iframe.onerror = function() {
+                iframe.style.display = 'none';
+                document.getElementById('preview_loading').style.display = 'none';
+                tampilFallback(data.surat_peminjaman.split('/').pop(), data.surat_peminjaman);
+            };
+            iframe.src = 'view_document.php?path=' + encodeURIComponent(data.surat_peminjaman);
+        } else {
+            document.getElementById('preview_loading').style.display = 'none';
+            tampilFallback(data.surat_peminjaman.split('/').pop(), data.surat_peminjaman);
+        }
+    }
+
+    function tampilFallback(namaFile, filePath) {
+        document.getElementById('preview_fallback_nama').textContent = namaFile;
+        let btns = '';
+        if (filePath) {
+            btns += `<a href="view_document.php?path=${encodeURIComponent(filePath)}" target="_blank"
+                        style="display:inline-block;background:rgba(0,210,255,0.1);border:1px solid rgba(0,210,255,0.3);color:#00d2ff;padding:10px 22px;border-radius:10px;font-size:20px;font-weight:700;text-decoration:none;margin-right:10px;">
+                        🔗 Buka di Tab Baru</a>`;
+        }
+        document.getElementById('preview_fallback_btns').innerHTML = btns;
+        document.getElementById('preview_fallback').style.display  = 'block';
+    }
+
+    function editRuangan(data) {
+        toggleModal('ruanganModal');
+        document.getElementById('edit_id_ruangan').value = data.id_ruangan || '';
+        document.getElementById('nama_ruangan').value = data.nama_ruangan || '';
+        document.getElementById('kapasitas').value = data.kapasitas || '';
+        document.getElementById('kursi').value = data.kursi || '';
+        document.getElementById('meja').value = data.meja || '';
+        document.getElementById('ac').checked = data.ac == 1;
+        document.getElementById('papan_tulis').checked = data.papan_tulis == 1;
+        document.getElementById('proyektor').checked = data.proyektor == 1;
+    }
+
+    document.getElementById('ruanganModal').addEventListener('click', function(e) {
+        if (e.target === this) resetRuanganForm();
+    });
+    
+    function resetRuanganForm() {
+        document.getElementById('edit_id_ruangan').value = '';
+        document.getElementById('nama_ruangan').value = '';
+        document.getElementById('kapasitas').value = '';
+        document.getElementById('kursi').value = '';
+        document.getElementById('meja').value = '';
+        document.getElementById('ac').checked = false;
+        document.getElementById('papan_tulis').checked = false;
+        document.getElementById('proyektor').checked = false;
+    }
+
+    if (window.location.search.includes('msg=')) {
+        window.history.replaceState(null, '', window.location.pathname);
+    }
+
+    // =======================================================
+    // SCRIPT PENGECEKAN KONFLIK JADWAL REAL-TIME
+    // =======================================================
+    document.addEventListener('DOMContentLoaded', initCekJadwal);
+
+    function initCekJadwal() {
+        const selRuangan = document.getElementById('sel_ruangan');
+        const inpMulai   = document.getElementById('inp_mulai');
+        const inpSelesai = document.getElementById('inp_selesai');
+        const alertBox   = document.getElementById('konflik_alert');
+        const btnAjukan  = document.getElementById('btn_ajukan');
+
+        if (!selRuangan || !inpMulai || !inpSelesai || !alertBox) return;
+
+        let debounceTimer = null;
+
+        [selRuangan, inpMulai, inpSelesai].forEach(el => {
+            el.addEventListener('change', () => {
+                clearTimeout(debounceTimer);
+                debounceTimer = setTimeout(cekKonflik, 400); 
+            });
+        });
+
+        async function cekKonflik() {
+            const idRuangan  = selRuangan.value;
+            const waktuMulai = inpMulai.value;
+            const waktuSelesai = inpSelesai.value;
+
+            if (!idRuangan || !waktuMulai || !waktuSelesai) {
+                sembunyikanAlert();
+                return;
+            }
+
+            tampilLoading();
+
+            try {
+                const url = `cek_jadwal.php?id_ruangan=${encodeURIComponent(idRuangan)}`
+                          + `&waktu_mulai=${encodeURIComponent(waktuMulai)}`
+                          + `&waktu_selesai=${encodeURIComponent(waktuSelesai)}`;
+
+                const resp = await fetch(url, { credentials: 'same-origin' });
+                if (!resp.ok) throw new Error('Network error');
+                const json = await resp.json();
+
+                if (json.konflik) {
+                    tampilKonflik(json);
+                } else {
+                    tampilAman(json.pesan);
+                }
+            } catch (err) {
+                sembunyikanAlert();
+                console.warn('cek_jadwal error:', err);
+            }
+        }
+
+        function tampilLoading() {
+            alertBox.style.display = 'block';
+            alertBox.innerHTML = `
+                <div style="display:flex; align-items:center; gap:10px; background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.1); border-radius:10px; padding:12px 16px; color:rgba(255,255,255,0.4); font-size:13px;">
+                    <span style="animation:spin 1s linear infinite;display:inline-block;">⏳</span>
+                    Mengecek ketersediaan ruangan...
+                </div>`;
+        }
+
+        function tampilAman(pesan) {
+            alertBox.style.display = 'block';
+            alertBox.innerHTML = `
+                <div style="background:rgba(0,255,102,0.08); border:1px solid rgba(0,255,102,0.3); border-radius:10px; padding:12px 16px; color:#00FF66; font-size:13px; font-weight:600;">
+                    ✅ ${pesan || 'Ruangan tersedia pada waktu yang dipilih.'}
+                </div>`;
+            if (btnAjukan) {
+                btnAjukan.disabled = false;
+                btnAjukan.style.opacity = '1';
+                btnAjukan.style.cursor  = 'pointer';
+            }
+        }
+
+        function tampilKonflik(json) {
+            let rows = json.data.map(d => {
+                const statusColor = d.status === 'Disetujui' ? '#00FF66' : '#facc15';
+                return `
+                <div style="margin-top:10px; padding:10px 12px; background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.08); border-radius:8px; font-size:12px;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+                        <span style="color:#fff; font-weight:700;">${d.peminjam}</span>
+                        <span style="font-size:11px; font-weight:800; letter-spacing:0.5px; color:${statusColor}; border:1px solid ${statusColor}; padding:2px 8px; border-radius:6px;">
+                            ${d.status.toUpperCase()}
+                        </span>
+                    </div>
+                    <div style="color:rgba(255,255,255,0.5);">⏰ ${d.mulai} – ${d.selesai}</div>
+                    <div style="color:rgba(255,255,255,0.35); margin-top:2px;">📋 ${d.keperluan || '-'}</div>
+                </div>`;
+            }).join('');
+
+            alertBox.style.display = 'block';
+            alertBox.innerHTML = `
+                <div style="background:rgba(255,49,49,0.08); border:1px solid rgba(255,49,49,0.4); border-radius:10px; padding:14px 16px;">
+                    <div style="color:#FF3131; font-size:13px; font-weight:700; margin-bottom:2px;">⚠️ Jadwal Bertabrakan!</div>
+                    <div style="color:rgba(255,255,255,0.7); font-size:13px; line-height:1.5;">${json.pesan}</div>
+                    ${rows}
+                    <div style="margin-top:12px; font-size:12px; font-weight:600; color:rgba(255,49,49,0.8); border-top:1px solid rgba(255,49,49,0.2); padding-top:10px;">
+                        Silakan pilih waktu lain atau ruangan berbeda.
+                    </div>
+                </div>`;
+
+            if (btnAjukan) {
+                btnAjukan.disabled = true;
+                btnAjukan.style.opacity = '0.45';
+                btnAjukan.style.cursor  = 'not-allowed';
+            }
+        }
+
+        function sembunyikanAlert() {
+            alertBox.style.display = 'none';
+            alertBox.innerHTML = '';
+            if (btnAjukan) {
+                btnAjukan.disabled = false;
+                btnAjukan.style.opacity = '1';
+                btnAjukan.style.cursor  = 'pointer';
+            }
+        }
+    }
 </script>
+
+<?php include 'partials/footer.php'; ?>
 <?php
 ini_set('display_errors', 1);
 ini_set('display_startup_errors', 1);

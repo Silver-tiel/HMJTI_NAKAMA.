@@ -9,7 +9,7 @@ if (!isset($_SESSION['user'])) {
 
 $user = $_SESSION['user'];
 $role = strtolower($user['role_derived'] ?? 'anggota');
-if (!in_array($role, ['ketua', 'sekretaris', 'bendahara'])) {
+if (!in_array($role, ['ketua','bendahara'])) {
     die("Akses ditolak.");
 }
 

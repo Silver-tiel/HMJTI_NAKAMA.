@@ -6,9 +6,6 @@ mysqli_report(MYSQLI_REPORT_ERROR | MYSQLI_REPORT_STRICT);
 
 $action = $_POST['action'] ?? $_GET['action'] ?? '';
 
-/**
- * Hitung saldo kas saat ini (hanya transaksi Berhasil/Disetujui).
- */
 function getSaldoKas($conn): float {
     $q = $conn->query("
         SELECT 
@@ -19,26 +16,18 @@ function getSaldoKas($conn): float {
     return (float)($q->fetch_assoc()['saldo'] ?? 0);
 }
 
-/**
- * Validasi apakah id_anggota ada di tabel anggota
- */
 function isValidAnggota($conn, $id_anggota): bool {
     $stmt = $conn->prepare("SELECT 1 FROM anggota WHERE id_anggota = ? LIMIT 1");
     $stmt->bind_param("i", $id_anggota);
     $stmt->execute();
-    $result = $stmt->get_result();
-    return $result->num_rows > 0;
+    return $stmt->get_result()->num_rows > 0;
 }
 
-/**
- * Validasi apakah id_kategori ada di tabel kategori
- */
 function isValidKategori($conn, $id_kategori): bool {
     $stmt = $conn->prepare("SELECT 1 FROM kategori WHERE id_kategori = ? LIMIT 1");
     $stmt->bind_param("i", $id_kategori);
     $stmt->execute();
-    $result = $stmt->get_result();
-    return $result->num_rows > 0;
+    return $stmt->get_result()->num_rows > 0;
 }
 
 try {
@@ -46,47 +35,59 @@ try {
 
         // ── TAMBAH PEMASUKAN ──────────────────────────────────────────────
         if ($action === 'tambah_pemasukan') {
-            $bukti  = null;
-            $status = $_POST['status'] ?? 'Menunggu';
+            $bukti       = null;
+            $status      = $_POST['status'] ?? 'Menunggu';
+            $id_anggota  = (int)$_POST['id_anggota'];
+            $id_kategori = (int)$_POST['id_kategori'];
+            $jumlah      = (float)$_POST['jumlah'];
 
-            $id_anggota     = (int)$_POST['id_anggota'];
-            $id_kategori    = (int)$_POST['id_kategori'];
-
-            // Validasi apakah id_anggota dan id_kategori valid
             if (!isValidAnggota($db->conn, $id_anggota)) {
-                $_SESSION['error'] = "Pencatat (Anggota) tidak valid atau telah dihapus. Silakan pilih pencatat yang benar.";
+                $_SESSION['error'] = "Pencatat tidak valid. Silakan pilih pencatat yang benar.";
                 header("Location: ../tambah_pemasukan.php");
                 exit;
             }
             if (!isValidKategori($db->conn, $id_kategori)) {
-                $_SESSION['error'] = "Kategori tidak valid atau telah dihapus. Silakan pilih kategori yang benar.";
+                $_SESSION['error'] = "Kategori tidak valid. Silakan pilih kategori yang benar.";
                 header("Location: ../tambah_pemasukan.php");
                 exit;
             }
 
             if (isset($_FILES['bukti_pembayaran']) && $_FILES['bukti_pembayaran']['error'] === UPLOAD_ERR_OK) {
+                $fileTmpPath = $_FILES['bukti_pembayaran']['tmp_name'];
+                $fileNameOrig = $_FILES['bukti_pembayaran']['name'];
+                
+                $allowedMimeTypes = ['image/jpeg', 'image/png', 'image/jpg', 'image/gif', 'image/webp', 'application/pdf'];
+                $fileMimeType = mime_content_type($fileTmpPath);
+                
+                $fileExtension = strtolower(pathinfo($fileNameOrig, PATHINFO_EXTENSION));
+                $allowedExtensions = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'pdf'];
+                
+                if (!in_array($fileExtension, $allowedExtensions) || !in_array($fileMimeType, $allowedMimeTypes)) {
+                    $detail = urlencode('File bukti pembayaran harus berupa Gambar (JPG/PNG) atau Dokumen PDF.');
+                    header("Location: ../keuangan.php?msg=error&detail=$detail");
+                    exit;
+                }
+
                 $uploadDir = '../uploads/keuangan/';
                 if (!is_dir($uploadDir)) mkdir($uploadDir, 0777, true);
-                $fileName = time() . '_' . basename($_FILES['bukti_pembayaran']['name']);
-                if (move_uploaded_file($_FILES['bukti_pembayaran']['tmp_name'], $uploadDir . $fileName)) {
+                $fileName = time() . '_' . basename($fileNameOrig);
+                if (move_uploaded_file($fileTmpPath, $uploadDir . $fileName)) {
                     $bukti = 'uploads/keuangan/' . $fileName;
                 }
             }
 
-            $kode_pemasukan = $_POST['kode_pemasukan'];
             $sumber_dana    = $_POST['sumber_dana'];
-            $jumlah         = $_POST['jumlah'];
             $tanggal        = $_POST['tanggal'];
 
             $stmt = $db->conn->prepare(
                 "INSERT INTO pemasukan 
-                    (id_anggota, id_kategori, kode_pemasukan, sumber_dana, jumlah, tanggal, status, bukti_pembayaran) 
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
+                    (id_anggota, id_kategori, sumber_dana, jumlah, tanggal, status, bukti_pembayaran) 
+                 VALUES (?, ?, ?, ?, ?, ?, ?)"
             );
             $stmt->bind_param(
-                "iissssss",
+                "iisdsss",
                 $id_anggota, $id_kategori,
-                $kode_pemasukan, $sumber_dana,
+                $sumber_dana,
                 $jumlah, $tanggal, $status, $bukti
             );
             $stmt->execute();
@@ -96,18 +97,10 @@ try {
 
         // ── EDIT PEMASUKAN ────────────────────────────────────────────────
         elseif ($action === 'edit_pemasukan') {
-            $user_role = $_SESSION['user']['role_derived'] ?? 'anggota';
-            if (!in_array($user_role, ['ketua', 'bendahara'])) {
-                header("Location: ../keuangan.php?msg=error&detail=" . urlencode("Akses ditolak."));
-                exit;
-            }
-
             $id_pemasukan = (int)$_POST['id_pemasukan'];
             $status       = $_POST['status'];
 
-            $stmt = $db->conn->prepare(
-                "UPDATE pemasukan SET status=? WHERE id_pemasukan=?"
-            );
+            $stmt = $db->conn->prepare("UPDATE pemasukan SET status=? WHERE id_pemasukan=?");
             $stmt->bind_param("si", $status, $id_pemasukan);
             $stmt->execute();
             header("Location: ../keuangan.php?msg=updated");
@@ -116,50 +109,67 @@ try {
 
         // ── TAMBAH PENGELUARAN ────────────────────────────────────────────
         elseif ($action === 'tambah_pengeluaran') {
-            $jumlah = (float)$_POST['jumlah'];
-            $status = $_POST['status'] ?? 'Menunggu';
+            $jumlah      = (float)$_POST['jumlah'];
+            $status      = $_POST['status'] ?? 'Menunggu';
+            $id_anggota  = (int)$_POST['id_anggota'];
+            $id_kategori = (int)$_POST['id_kategori'];
 
-            $id_anggota       = (int)$_POST['id_anggota'];
-            $id_kategori      = (int)$_POST['id_kategori'];
-
-            // Validasi apakah id_anggota dan id_kategori valid
             if (!isValidAnggota($db->conn, $id_anggota)) {
-                $_SESSION['error'] = "Pencatat (Anggota) tidak valid atau telah dihapus. Silakan pilih pencatat yang benar.";
+                $_SESSION['error'] = "Pencatat tidak valid. Silakan pilih pencatat yang benar.";
                 header("Location: ../tambah_pengeluaran.php");
                 exit;
             }
             if (!isValidKategori($db->conn, $id_kategori)) {
-                $_SESSION['error'] = "Kategori tidak valid atau telah dihapus. Silakan pilih kategori yang benar.";
+                $_SESSION['error'] = "Kategori tidak valid. Silakan pilih kategori yang benar.";
                 header("Location: ../tambah_pengeluaran.php");
                 exit;
             }
+ /* if (isset($_FILES['bukti_pembayaran']) && $_FILES['bukti_pembayaran']['error'] === UPLOAD_ERR_OK) {
+                $fileTmpPath = $_FILES['bukti_pembayaran']['tmp_name'];
+                $fileNameOrig = $_FILES['bukti_pembayaran']['name'];
 
-            // Validasi saldo: hanya blokir jika status Disetujui/Berhasil
-            if (in_array($status, ['Disetujui', 'Berhasil'])) {
-                $saldo = getSaldoKas($db->conn);
-                if ($jumlah > $saldo) {
-                    $detail = urlencode(
-                        'Pengeluaran Rp ' . number_format($jumlah, 0, ',', '.') .
-                        ' melebihi saldo kas Rp ' . number_format($saldo, 0, ',', '.') . '.'
-                    );
+                $allowedMimeTypes = ['image/jpeg', 'image/png', 'image/jpg', 'image/gif', 'image/webp', 'application/pdf'];
+                $fileMimeType = mime_content_type($fileTmpPath);
+
+                $fileExtension = strtolower(pathinfo($fileNameOrig, PATHINFO_EXTENSION));
+                $allowedExtensions = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'pdf'];
+
+                if (!in_array($fileExtension, $allowedExtensions) || !in_array($fileMimeType, $allowedMimeTypes)) {
+                    $detail = urlencode('File bukti pembayaran harus berupa Gambar (JPG/PNG) atau Dokumen PDF.');
                     header("Location: ../keuangan.php?msg=error&detail=$detail");
                     exit;
                 }
+
+                $uploadDir = '../uploads/keuangan/';
+                if (!is_dir($uploadDir))
+                    mkdir($uploadDir, 0777, true);
+                $fileName = time() . '_' . basename($fileNameOrig);
+                if (move_uploaded_file($fileTmpPath, $uploadDir . $fileName)) {
+                    $bukti = 'uploads/keuangan/' . $fileName;
+                }
+            } */
+            $saldo = getSaldoKas($db->conn);
+            if ($jumlah > $saldo) {
+                $detail = urlencode(
+                    'Pengeluaran Rp ' . number_format($jumlah, 2, ',', '.') .
+                    ' melebihi saldo kas Rp ' . number_format($saldo, 2, ',', '.') . '.'
+                );
+                header("Location: ../keuangan.php?msg=error&detail=$detail");
+                exit;
             }
 
-            $kode_pengeluaran = $_POST['kode_pengeluaran'];
             $penerima         = $_POST['penerima'];
             $tanggal          = $_POST['tanggal'];
 
             $stmt = $db->conn->prepare(
                 "INSERT INTO pengeluaran 
-                    (id_anggota, id_kategori, kode_pengeluaran, penerima, jumlah, tanggal, status) 
-                 VALUES (?, ?, ?, ?, ?, ?, ?)"
+                    (id_anggota, id_kategori, penerima, jumlah, tanggal, status) 
+                 VALUES (?, ?, ?, ?, ?, ?)"
             );
             $stmt->bind_param(
-                "iisssss",
+                "iisdss",
                 $id_anggota, $id_kategori,
-                $kode_pengeluaran, $penerima,
+                $penerima,
                 $jumlah, $tanggal, $status
             );
             $stmt->execute();
@@ -168,12 +178,10 @@ try {
         }
 
         // ── EDIT PENGELUARAN ──────────────────────────────────────────────
-        // ── EDIT PENGELUARAN ──────────────────────────────────────────────
         elseif ($action === 'edit_pengeluaran') {
             $status         = $_POST['status'];
             $id_pengeluaran = (int)$_POST['id_pengeluaran'];
 
-            // Validasi saldo: hanya blokir jika status baru Disetujui/Berhasil
             if (in_array($status, ['Disetujui', 'Berhasil'])) {
                 $oldStmt = $db->conn->prepare(
                     "SELECT jumlah, status FROM pengeluaran WHERE id_pengeluaran = ?"
@@ -185,24 +193,21 @@ try {
                 $jumlah = (float)($oldData['jumlah'] ?? 0);
                 $saldo  = getSaldoKas($db->conn);
 
-                // Jika status LAMA sudah Disetujui/Berhasil, kembalikan dulu agar tidak double-count
                 if (in_array($oldData['status'], ['Disetujui', 'Berhasil'])) {
                     $saldo += $jumlah;
                 }
 
                 if ($jumlah > $saldo) {
                     $detail = urlencode(
-                        'Pengeluaran Rp ' . number_format($jumlah, 0, ',', '.') .
-                        ' melebihi saldo kas Rp ' . number_format($saldo, 0, ',', '.') . '.'
+                        'Pengeluaran Rp ' . number_format($jumlah, 2, ',', '.') .
+                        ' melebihi saldo kas Rp ' . number_format($saldo, 2, ',', '.') . '.'
                     );
                     header("Location: ../keuangan.php?msg=error&detail=$detail");
                     exit;
                 }
             }
 
-            $stmt = $db->conn->prepare(
-                "UPDATE pengeluaran SET status=? WHERE id_pengeluaran=?"
-            );
+            $stmt = $db->conn->prepare("UPDATE pengeluaran SET status=? WHERE id_pengeluaran=?");
             $stmt->bind_param("si", $status, $id_pengeluaran);
             $stmt->execute();
             header("Location: ../keuangan.php?msg=updated");
@@ -213,12 +218,6 @@ try {
 
         // ── HAPUS PEMASUKAN ───────────────────────────────────────────────
         if ($action === 'hapus_pemasukan' && isset($_GET['id'])) {
-            $user_role = $_SESSION['user']['role_derived'] ?? 'anggota';
-            if (!in_array($user_role, ['ketua', 'bendahara'])) {
-                header("Location: ../keuangan.php?msg=error&detail=" . urlencode("Akses ditolak."));
-                exit;
-            }
-
             $stmt = $db->conn->prepare("DELETE FROM pemasukan WHERE id_pemasukan=?");
             $stmt->bind_param("i", $_GET['id']);
             $stmt->execute();
@@ -244,4 +243,3 @@ try {
 
 header("Location: ../keuangan.php");
 exit;
-

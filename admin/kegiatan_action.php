@@ -29,8 +29,18 @@ try {
             $penanggung_jawab = trim($_POST['penanggung_jawab']);
             $id_anggota       = $_POST['id_anggota'];
 
-            if (empty($judul) || empty($id_anggota))
-                throw new Exception("Judul dan Penanggung Jawab Utama (Anggota) wajib diisi.");
+            // VALIDASI MINIMUM LENGTH (SERVER-SIDE)
+            if (empty($judul) || mb_strlen($judul) < 10)
+                throw new Exception("Gagal: Judul kegiatan minimal harus 10 karakter.");
+
+            if (empty($id_anggota))
+                throw new Exception("Gagal: Penanggung Jawab Utama wajib dipilih.");
+
+            if (empty($tempat) || mb_strlen($tempat) < 10)
+                throw new Exception("Gagal: Nama tempat minimal harus 10 karakter.");
+
+            if (empty($deskripsi) || mb_strlen($deskripsi) < 25)
+                throw new Exception("Gagal: Deskripsi kegiatan minimal harus 25 karakter.");
 
             if ($waktu_mulai && $waktu_selesai && strtotime($waktu_mulai) >= strtotime($waktu_selesai))
                 throw new Exception("Waktu selesai harus lebih besar dari waktu mulai.");
@@ -87,7 +97,7 @@ try {
                 }
             }
 
-            // Notifikasi otomatis: kegiatan baru dibuat (tipe_notif = 'manual', ditampilkan = 0)
+            // Notifikasi otomatis
             $judulNotif = "Kegiatan Baru: " . $judul;
             $waktuStr   = $waktu_mulai ? date('d M Y, H:i', strtotime($waktu_mulai)) : 'TBA';
             $pesanNotif = "Kegiatan baru telah ditambahkan. Pelaksanaan: " . $waktuStr . " di " . ($tempat ?: 'TBA') . ".";
@@ -111,7 +121,56 @@ try {
             if (!$isKetuaSekretaris)
                 throw new Exception("Akses ditolak. Hanya Ketua dan Sekretaris yang dapat mengubah kegiatan.");
 
-            $id               = (int)$_POST['id_kegiatan'];
+            $id = (int)$_POST['id_kegiatan'];
+
+            // Ambil data kegiatan dari DB untuk cek status
+            $stmtCek = $db->pdo->prepare("SELECT waktu_mulai, waktu_selesai FROM kegiatan WHERE id_kegiatan = ?");
+            $stmtCek->execute([$id]);
+            $kegiatanDB = $stmtCek->fetch(PDO::FETCH_ASSOC);
+            if (!$kegiatanDB) throw new Exception("Kegiatan tidak ditemukan.");
+
+            $now        = time();
+            $tMulai     = $kegiatanDB['waktu_mulai']  ? strtotime($kegiatanDB['waktu_mulai'])  : 0;
+            $tSelesai   = $kegiatanDB['waktu_selesai'] ? strtotime($kegiatanDB['waktu_selesai']) : 0;
+            $sudahMulai = $tMulai > 0 && $now >= $tMulai; // true jika sedang terlaksana atau selesai
+
+            $db->pdo->beginTransaction();
+
+            if ($sudahMulai) {
+                // ====================================================
+                // MODE TERBATAS: hanya tambah foto yang diizinkan
+                // ====================================================
+                if (!empty($_FILES['bukti']['name'][0])) {
+                    $uploadDir = '../uploads/kegiatan/';
+                    if (!is_dir($uploadDir)) mkdir($uploadDir, 0755, true);
+
+                    $stmtBukti = $db->pdo->prepare(
+                        "INSERT INTO bukti_kegiatan (id_kegiatan, file_bukti) VALUES (?, ?)"
+                    );
+
+                    foreach ($_FILES['bukti']['tmp_name'] as $key => $tmp_name) {
+                        if ($_FILES['bukti']['error'][$key] !== UPLOAD_ERR_OK) continue;
+
+                        $ext = strtolower(pathinfo($_FILES['bukti']['name'][$key], PATHINFO_EXTENSION));
+                        if (in_array($ext, ['jpg', 'jpeg', 'png', 'webp'])) {
+                            $newName = uniqid('img_') . '.' . $ext;
+                            if (move_uploaded_file($tmp_name, $uploadDir . $newName)) {
+                                $stmtBukti->execute([$id, 'uploads/kegiatan/' . $newName]);
+                            }
+                        } else {
+                            throw new Exception("Format gambar tidak valid. Hanya JPG, PNG, WEBP.");
+                        }
+                    }
+                }
+
+                $db->pdo->commit();
+                header("location:../kegiatan.php?msg=updated");
+                exit();
+            }
+
+            // ====================================================
+            // MODE PENUH: kegiatan belum mulai, semua field bisa diedit
+            // ====================================================
             $judul            = trim($_POST['judul']);
             $deskripsi        = trim($_POST['deskripsi']);
             $waktu_mulai      = !empty($_POST['waktu_mulai'])   ? $_POST['waktu_mulai']   : null;
@@ -120,13 +179,20 @@ try {
             $penanggung_jawab = trim($_POST['penanggung_jawab']);
             $id_anggota       = !empty($_POST['id_anggota']) ? (int)$_POST['id_anggota'] : null;
 
-            if (empty($judul))
-                throw new Exception("Judul wajib diisi.");
+            // VALIDASI MINIMUM LENGTH (SERVER-SIDE)
+            if (empty($judul) || mb_strlen($judul) < 10)
+                throw new Exception("Gagal: Judul kegiatan minimal harus 10 karakter.");
+
+            if (empty($tempat) || mb_strlen($tempat) < 10)
+                throw new Exception("Gagal: Nama tempat minimal harus 10 karakter.");
+
+            if (empty($deskripsi) || mb_strlen($deskripsi) < 25)
+                throw new Exception("Gagal: Deskripsi kegiatan minimal harus 25 karakter.");
 
             if ($waktu_mulai && $waktu_selesai && strtotime($waktu_mulai) >= strtotime($waktu_selesai))
                 throw new Exception("Waktu selesai harus lebih besar dari waktu mulai.");
 
-            // Validasi tumpang tindih waktu (Overlap Check) untuk Edit (Abaikan diri sendiri)
+            // Validasi tumpang tindih waktu (Overlap Check)
             if ($waktu_mulai && $waktu_selesai) {
                 $stmtCheck = $db->pdo->prepare("
                     SELECT judul FROM kegiatan 
@@ -138,8 +204,6 @@ try {
                     throw new Exception("Gagal: Jadwal bertabrakan dengan kegiatan yang sudah ada (\"" . $overlap['judul'] . "\").");
                 }
             }
-
-            $db->pdo->beginTransaction();
 
             if ($id_anggota) {
                 $stmt = $db->pdo->prepare(
@@ -180,23 +244,15 @@ try {
             }
 
             $db->pdo->commit();
-            header("location:../kegiatan.php?msg=updated");
-            exit();
-        }
 
-        // --- 3. PROSES KIRIM NOTIFIKASI MANUAL ---
-        if (isset($_POST['action']) && $_POST['action'] === 'kirim_notif') {
-            if (!$isKetuaSekretaris)
-                throw new Exception("Akses ditolak. Hanya Ketua dan Sekretaris yang dapat mengirim notifikasi.");
-
-            $id_kegiatan = (int)$_POST['id_kegiatan'];
-            $judul       = trim($_POST['judul_notif']);
-            $pesan       = trim($_POST['pesan_notif']);
-
-            if (empty($judul) || empty($pesan))
-                throw new Exception("Judul dan pesan notifikasi wajib diisi.");
-
+            // Hapus notifikasi lama kegiatan ini & kirim ulang dengan info terbaru
             $db->pdo->beginTransaction();
+
+            $db->pdo->prepare("DELETE FROM notifikasi WHERE id_kegiatan = ?")->execute([$id]);
+
+            $judulNotif = "Kegiatan Diperbarui: " . $judul;
+            $waktuStr   = $waktu_mulai ? date('d M Y, H:i', strtotime($waktu_mulai)) : 'TBA';
+            $pesanNotif = "Info kegiatan telah diperbarui. Pelaksanaan: " . $waktuStr . " di " . ($tempat ?: 'TBA') . ".";
 
             $resAnggota = $db->pdo->query("SELECT id_anggota FROM anggota");
             $stmtNotif  = $db->pdo->prepare(
@@ -204,13 +260,14 @@ try {
                  VALUES (?, ?, ?, ?, 'manual', 0)"
             );
             while ($row = $resAnggota->fetch(PDO::FETCH_ASSOC)) {
-                $stmtNotif->execute([$id_kegiatan, $row['id_anggota'], $judul, $pesan]);
+                $stmtNotif->execute([$id, $row['id_anggota'], $judulNotif, $pesanNotif]);
             }
 
             $db->pdo->commit();
-            header("location:../kegiatan.php?msg=notif_sent");
+            header("location:../kegiatan.php?msg=updated");
             exit();
         }
+
     }
 
     // --- 4. PROSES HAPUS ---
@@ -244,8 +301,6 @@ try {
     if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['action'])) {
         $id_user = (int)($_SESSION['user']['id_anggota'] ?? 0);
 
-        // Tandai toast sudah ditampilkan (dipanggil JS saat toast muncul)
-        // Setelah ini di-set 1, notif tidak akan masuk $notifUntukToast lagi → toast tidak muncul lagi saat login ulang
         if ($_GET['action'] === 'tandai_ditampilkan') {
             $id_notif = (int)$_GET['id'];
             $stmt = $db->pdo->prepare(
@@ -256,7 +311,6 @@ try {
             exit();
         }
 
-        // Tandai semua notif belum ditampilkan sebagai sudah ditampilkan
         if ($_GET['action'] === 'tandai_semua_ditampilkan') {
             $stmt = $db->pdo->prepare(
                 "UPDATE notifikasi SET ditampilkan = 1 WHERE id_anggota = ? AND ditampilkan = 0"
@@ -266,7 +320,6 @@ try {
             exit();
         }
 
-        // Tandai satu notif sebagai dibaca
         if ($_GET['action'] === 'baca_notif') {
             $id_notif = (int)$_GET['id'];
             $stmt = $db->pdo->prepare(
@@ -278,7 +331,6 @@ try {
             exit();
         }
 
-        // Tandai semua notif sebagai dibaca
         if ($_GET['action'] === 'baca_semua_notif') {
             $stmt = $db->pdo->prepare(
                 "UPDATE notifikasi SET dibaca = 1, dibaca_pada = NOW(), ditampilkan = 1

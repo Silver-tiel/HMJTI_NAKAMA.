@@ -32,6 +32,12 @@ if (!$user) {
     exit;
 }
 
+if (strtolower($user['status_keanggotaan']) === 'alumni') {
+    http_response_code(403);
+    echo json_encode(['success' => false, 'message' => 'Akun Alumni tidak dapat digunakan untuk login.']);
+    exit;
+}
+
 // Set session seperti yang dilakukan saat login biasa
 $_SESSION['user'] = $user;
 

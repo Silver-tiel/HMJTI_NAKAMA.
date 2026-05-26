@@ -117,12 +117,11 @@
     // Mobile Menu Toggle
     // ============================================
     function initMobileMenu() {
-        const menuToggle = document.querySelector('#sidebar-toggle');
+        const menuToggle = document.querySelector('.mobile-menu-toggle');
         const sidebar = document.getElementById('sidebar');
         
         if (menuToggle && sidebar) {
-            menuToggle.addEventListener('click', (e) => {
-                e.stopPropagation();
+            menuToggle.addEventListener('click', () => {
                 sidebar.classList.toggle('open');
             });
 

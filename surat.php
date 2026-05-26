@@ -124,6 +124,11 @@ include 'partials/sidebar.php';
                                 $color = $st == 'Selesai' ? '#00FF66' : ($st == 'Ditolak' ? '#FF3131' : '#facc15');
                             ?>
                             <span style="border:1px solid <?= $color ?>; color:<?= $color ?>; padding:4px 10px; border-radius:6px; font-size:10px; font-weight:800;"><?= strtoupper($st) ?></span>
+                            <?php if (!empty($s['alasan'])): ?>
+                                <div style="margin-top:10px; font-size:11px; color:rgba(255,255,255,0.7); background:rgba(255,255,255,0.05); padding:8px; border-radius:6px; border-left:3px solid <?= $color ?>; text-align:left; line-height:1.4;">
+                                    <strong>Catatan:</strong> <?= htmlspecialchars($s['alasan']) ?>
+                                </div>
+                            <?php endif; ?>
 
                             <div style="margin-top:15px; display:flex; gap:10px; justify-content:flex-end; align-items:center; flex-wrap:wrap;">
                                 <button class="btn-lihat-surat" data-surat="<?= $jsonData ?>">
@@ -225,6 +230,7 @@ include 'partials/sidebar.php';
                 <option value="Selesai">Selesai</option>
                 <option value="Ditolak">Ditolak</option>
             </select>
+            <textarea name="alasan" id="edit_alasan" class="form-input" placeholder="Alasan surat (opsional, cth: alasan ditolak atau catatan tambahan)" rows="3" style="margin-top: 15px; resize: vertical;"></textarea>
             <div style="display:flex; gap:15px; margin-top:25px;">
                 <button type="submit" name="edit_surat" style="flex:1; background:#facc15; color:#000; padding:12px; border-radius:10px; border:none; font-weight:800; cursor:pointer;">UPDATE</button>
                 <button type="button" onclick="toggleModal('editSuratModal')" style="flex:1; background:rgba(255,255,255,0.05); color:#fff; padding:12px; border-radius:10px; border:none; cursor:pointer;">BATAL</button>
@@ -269,6 +275,7 @@ document.addEventListener('click', function(e) {
         const data = JSON.parse(btnEdit.getAttribute('data-surat'));
         document.getElementById('edit_id').value     = data.id_pengajuan;
         document.getElementById('edit_status').value = data.status;
+        document.getElementById('edit_alasan').value = ''; // Reset alasan
         toggleModal('editSuratModal');
         return;
     }
@@ -379,6 +386,11 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 });
+
+    // Bersihkan ?msg= dari URL tanpa reload (agar hilang saat refresh)
+    if (window.location.search.includes('msg=')) {
+        window.history.replaceState(null, '', window.location.pathname);
+    }
 </script>
 
 <?php include 'partials/footer.php'; ?>

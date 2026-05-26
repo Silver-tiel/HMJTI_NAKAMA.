@@ -59,8 +59,18 @@ try {
         elseif (isset($_POST['edit_surat'])) {
             $id = $_POST['id_pengajuan'];
             $status_baru = $_POST['status'];
+            $alasan = isset($_POST['alasan']) && trim($_POST['alasan']) !== '' ? trim($_POST['alasan']) : null;
             $tanggal = date('Y-m-d');
             $id_anggota = $_SESSION['user']['id_anggota'];
+
+            // Cek dan tambahkan kolom alasan jika belum ada (opsional/otomatis)
+            try {
+                $db->conn->query("ALTER TABLE status_history ADD COLUMN alasan TEXT NULL");
+            } catch (Exception $e) {}
+            
+            try {
+                $db->conn->query("ALTER TABLE pengajuan_surat ADD COLUMN alasan TEXT NULL");
+            } catch (Exception $e) {}
 
             $db->conn->begin_transaction();
 
@@ -73,13 +83,13 @@ try {
             $status_lama = $row['status'] ?? '';
 
             // Update pengajuan_surat
-            $stmtUpdate = $db->conn->prepare("UPDATE pengajuan_surat SET status = ?, tanggal_update = ? WHERE id_pengajuan = ?");
-            $stmtUpdate->bind_param("ssi", $status_baru, $tanggal, $id);
+            $stmtUpdate = $db->conn->prepare("UPDATE pengajuan_surat SET status = ?, alasan = ?, tanggal_update = ? WHERE id_pengajuan = ?");
+            $stmtUpdate->bind_param("sssi", $status_baru, $alasan, $tanggal, $id);
             $stmtUpdate->execute();
 
             // Record status_history
-            $stmtHist = $db->conn->prepare("INSERT INTO status_history (id_pengajuan, id_anggota, status_lama, status_baru) VALUES (?, ?, ?, ?)");
-            $stmtHist->bind_param("iiss", $id, $id_anggota, $status_lama, $status_baru);
+            $stmtHist = $db->conn->prepare("INSERT INTO status_history (id_pengajuan, id_anggota, status_lama, status_baru, alasan) VALUES (?, ?, ?, ?, ?)");
+            $stmtHist->bind_param("iisss", $id, $id_anggota, $status_lama, $status_baru, $alasan);
             $stmtHist->execute();
 
             $db->conn->commit();

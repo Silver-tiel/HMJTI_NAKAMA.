@@ -1,12 +1,4 @@
-/* ============================================
-   TemplateMo 3D Glassmorphism Dashboard
-   https://templatemo.com
-   CSS Stylesheet
-============================================ */
 
-/* ============================================
-   CSS CUSTOM PROPERTIES
-============================================ */
 :root {
     /* Primary Colors - Navy, White & Light Blue Theme */
     --emerald: #1e40af;       /* Navy */
@@ -526,6 +518,7 @@ a {
     backdrop-filter: blur(20px);
     -webkit-backdrop-filter: blur(20px);
     border: 1px solid var(--glass-border);
+    
     border-radius: var(--border-radius);
     padding: var(--card-padding);
     position: relative;

@@ -202,7 +202,6 @@ include 'partials/sidebar.php';
                     'success'    => '✅ Agenda berhasil ditambahkan!',
                     'updated'    => '✅ Agenda berhasil diperbarui!',
                     'deleted'    => '🗑 Agenda berhasil dihapus!',
-                    'notif_sent' => '🔔 Notifikasi berhasil dikirim ke semua anggota!',
                     'error'      => '❌ Terjadi kesalahan: ' . htmlspecialchars($_GET['detail'] ?? 'Gagal memproses.'),
                     default      => ''
                 };
@@ -215,6 +214,22 @@ include 'partials/sidebar.php';
         <!-- GRID KEGIATAN -->
         <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 25px;">
             <?php if(!empty($resKegiatan)): foreach($resKegiatan as $k): ?>
+            <?php
+                // Hitung status di awal iterasi agar tersedia untuk tombol edit
+                $now_s    = time();
+                $tMulai_s = $k['waktu_mulai']  ? strtotime($k['waktu_mulai'])  : 0;
+                $tSelesai_s = $k['waktu_selesai'] ? strtotime($k['waktu_selesai']) : 0;
+                if ($tMulai_s && $tSelesai_s) {
+                    if ($now_s < $tMulai_s)                              { $statusLabel = 'Rencana';           $badgeColor = '#facc15'; }
+                    elseif ($now_s >= $tMulai_s && $now_s < $tSelesai_s) { $statusLabel = 'Sedang Terlaksana'; $badgeColor = '#00d2ff'; }
+                    else                                                  { $statusLabel = 'Selesai';            $badgeColor = '#00FF66'; }
+                } elseif ($tMulai_s) {
+                    $statusLabel = ($now_s >= $tMulai_s) ? 'Selesai' : 'Rencana';
+                    $badgeColor  = ($now_s >= $tMulai_s) ? '#00FF66' : '#facc15';
+                } else {
+                    $statusLabel = 'Rencana'; $badgeColor = '#facc15';
+                }
+            ?>
             <div class="glass-card" style="padding: 0; overflow: hidden; position: relative; border: 1px solid var(--glass-border);">
                 <div style="height: 200px; background: #1a1a1a; overflow: hidden; position: relative;">
                     <?php if($k['cover']): ?>
@@ -227,8 +242,7 @@ include 'partials/sidebar.php';
                     
                     <?php if($isAdmin): ?>
                     <div style="position: absolute; top: 15px; right: 15px; display: flex; gap: 8px;">
-                        <button onclick='openNotifModal(<?= $k['id_kegiatan'] ?>, <?= json_encode($k['judul']) ?>)' style="background: rgba(0,0,0,0.6); border: 1px solid #00d2ff; border-radius: 8px; padding: 8px; color: #00d2ff; cursor: pointer; backdrop-filter: blur(5px);" title="Kirim Notifikasi">🔔</button>
-                        <button onclick='openEditModal(<?= json_encode($k) ?>)' style="background: rgba(0,0,0,0.6); border: 1px solid #facc15; border-radius: 8px; padding: 8px; color: #facc15; cursor: pointer; backdrop-filter: blur(5px);" title="Edit Kegiatan">✎</button>
+                        <button onclick='openEditModal(<?= json_encode($k) ?>, "<?= $statusLabel ?>")' style="background: rgba(0,0,0,0.6); border: 1px solid #facc15; border-radius: 8px; padding: 8px; color: #facc15; cursor: pointer; backdrop-filter: blur(5px);" title="Edit Kegiatan">💔</button>
                     </div>
                     <?php endif; ?>
                     
@@ -241,22 +255,6 @@ include 'partials/sidebar.php';
                     </div>
                     <h3 style="font-weight: 800; color: #fff; font-size: 1.1rem; margin-bottom: 15px;"><?= strtoupper($k['judul']) ?></h3>
                     <div style="display: flex; justify-content: space-between; align-items: center;">
-                        <?php 
-                        $now      = time();
-                        $tMulai   = $k['waktu_mulai']  ? strtotime($k['waktu_mulai'])  : 0;
-                        $tSelesai = $k['waktu_selesai'] ? strtotime($k['waktu_selesai']) : 0;
-
-                        if ($tMulai && $tSelesai) {
-                            if ($now < $tMulai)                          { $statusLabel = 'Rencana';           $badgeColor = '#facc15'; }
-                            elseif ($now >= $tMulai && $now < $tSelesai) { $statusLabel = 'Sedang Terlaksana'; $badgeColor = '#00d2ff'; }
-                            else                                          { $statusLabel = 'Selesai';            $badgeColor = '#00FF66'; }
-                        } elseif ($tMulai) {
-                            $statusLabel = ($now >= $tMulai) ? 'Selesai' : 'Rencana';
-                            $badgeColor  = ($now >= $tMulai) ? '#00FF66' : '#facc15';
-                        } else {
-                            $statusLabel = 'Rencana'; $badgeColor = '#facc15';
-                        }
-                        ?>
                         <span style="background: <?= $badgeColor ?>20; color: <?= $badgeColor ?>; padding: 4px 12px; border-radius: 20px; font-size: 10px; font-weight: 800; border: 1px solid <?= $badgeColor ?>; display:inline-flex; align-items:center; gap:5px;">
                             <?php if($statusLabel === 'Sedang Terlaksana'): ?>
                                 <span style="width:7px;height:7px;border-radius:50%;background:<?= $badgeColor ?>;display:inline-block;box-shadow:0 0 6px <?= $badgeColor ?>;animation:blink 1s infinite;"></span>
@@ -280,7 +278,8 @@ include 'partials/sidebar.php';
         <h3 style="color:#fff; font-size: 1.5rem; font-weight: 800; margin-bottom: 25px;">Tambah Agenda HMJ</h3>
         <form action="admin/kegiatan_action.php" method="POST" enctype="multipart/form-data">
             <div style="display:flex; flex-direction:column; gap:15px;">
-                <input type="text" name="judul" placeholder="Judul Kegiatan" class="form-input" required>
+                <input type="text" name="judul" id="add_judul" placeholder="Judul Kegiatan" class="form-input" required minlength="10">
+                <span id="add_judul_err" style="color:#ff6b6b; font-size:11px; margin-top:-10px; display:none;">⚠ Judul minimal 10 karakter</span>
                 <div style="display:grid; grid-template-columns: 1fr 1fr; gap:15px;">
                     <div>
                         <label style="color:rgba(255,255,255,0.5); font-size:11px;">Waktu Mulai</label>
@@ -293,11 +292,13 @@ include 'partials/sidebar.php';
                 </div>
                 <div>
                     <label style="color:rgba(255,255,255,0.5); font-size:11px;">Tempat</label>
-                    <input type="text" name="tempat" placeholder="Aula/Gedung" class="form-input">
+                    <input type="text" name="tempat" id="add_tempat" placeholder="Aula/Gedung" class="form-input" minlength="10">
+                    <span id="add_tempat_err" style="color:#ff6b6b; font-size:11px; margin-top:4px; display:none;">⚠ Tempat minimal 10 karakter</span>
                 </div>
                 <div>
                     <label style="color:rgba(255,255,255,0.5); font-size:11px;">Deskripsi Kegiatan</label>
-                    <textarea name="deskripsi" placeholder="Deskripsi atau keterangan singkat tentang kegiatan..." class="form-input" style="height: 80px; resize: none;"></textarea>
+                    <textarea name="deskripsi" id="add_deskripsi" placeholder="Deskripsi atau keterangan singkat tentang kegiatan..." class="form-input" style="height: 80px; resize: none;" minlength="25"></textarea>
+                    <span id="add_deskripsi_err" style="color:#ff6b6b; font-size:11px; margin-top:4px; display:none;">⚠ Deskripsi minimal 25 karakter</span>
                 </div>
                 <input type="text" name="penanggung_jawab" placeholder="Nama Ketua Pelaksana" class="form-input">
                 <select name="id_anggota" class="form-input" required>
@@ -323,6 +324,9 @@ include 'partials/sidebar.php';
 <div id="editKegiatanModal" class="modal-overlay">
     <div class="glass-card" style="max-width: 600px; width: 100%; max-height: 90vh; overflow-y: auto; padding: 30px;">
         <h3 style="color:#fff; font-size: 1.5rem; font-weight: 800; margin-bottom: 25px;">Update Kegiatan</h3>
+        <div id="edit_locked_banner" style="display:none; background:rgba(255,204,21,0.08); border:1px solid rgba(255,204,21,0.3); color:#facc15; padding:12px; border-radius:10px; font-size:12px; margin-bottom:20px;">
+            Kegiatan ini sudah dimulai atau selesai. Hanya penambahan foto yang diizinkan.
+        </div>
         <form action="admin/kegiatan_action.php" method="POST" enctype="multipart/form-data">
             <input type="hidden" name="id_kegiatan" id="edit_id">
             <div style="display:flex; flex-direction:column; gap:20px;">
@@ -330,7 +334,8 @@ include 'partials/sidebar.php';
                 </div>
                 <div>
                     <label style="color:rgba(255,255,255,0.5); font-size:11px;">Judul Kegiatan</label>
-                    <input type="text" name="judul" id="edit_judul" class="form-input" required>
+                    <input type="text" name="judul" id="edit_judul" class="form-input" required minlength="10">
+                    <span id="edit_judul_err" style="color:#ff6b6b; font-size:11px; margin-top:4px; display:none;">⚠ Judul minimal 10 karakter</span>
                 </div>
                 <div style="display:grid; grid-template-columns: 1fr 1fr; gap:15px;">
                     <div>
@@ -344,11 +349,13 @@ include 'partials/sidebar.php';
                 </div>
                 <div>
                     <label style="color:rgba(255,255,255,0.5); font-size:11px;">Tempat</label>
-                    <input type="text" name="tempat" id="edit_tempat" placeholder="Aula/Gedung" class="form-input">
+                    <input type="text" name="tempat" id="edit_tempat" placeholder="Aula/Gedung" class="form-input" minlength="10">
+                    <span id="edit_tempat_err" style="color:#ff6b6b; font-size:11px; margin-top:4px; display:none;">⚠ Tempat minimal 10 karakter</span>
                 </div>
                 <div>
                     <label style="color:rgba(255,255,255,0.5); font-size:11px;">Deskripsi Kegiatan</label>
-                    <textarea name="deskripsi" id="edit_deskripsi" placeholder="Deskripsi atau keterangan singkat..." class="form-input" style="height: 80px; resize: none;"></textarea>
+                    <textarea name="deskripsi" id="edit_deskripsi" placeholder="Deskripsi atau keterangan singkat..." class="form-input" style="height: 80px; resize: none;" minlength="25"></textarea>
+                    <span id="edit_deskripsi_err" style="color:#ff6b6b; font-size:11px; margin-top:4px; display:none;">⚠ Deskripsi minimal 25 karakter</span>
                 </div>
                 <div>
                     <label style="color:rgba(255,255,255,0.5); font-size:11px;">Nama Ketua Pelaksana</label>
@@ -377,34 +384,6 @@ include 'partials/sidebar.php';
     </div>
 </div>
 
-<!-- MODAL KIRIM NOTIFIKASI -->
-<div id="notifModal" class="modal-overlay">
-    <div class="glass-card" style="max-width: 450px; width: 100%; padding: 30px;">
-        <h3 style="color:#00d2ff; font-size: 1.2rem; font-weight: 800; margin-bottom: 5px;">Kirim Notifikasi Massal</h3>
-        <p style="color:var(--text-muted); font-size:11px; margin-bottom:20px;">Terkait Kegiatan: <b id="notif_judul_kegiatan" style="color:#fff;"></b></p>
-        
-        <form action="admin/kegiatan_action.php" method="POST">
-            <input type="hidden" name="action" value="kirim_notif">
-            <input type="hidden" name="id_kegiatan" id="notif_id_kegiatan">
-            
-            <div style="display:flex; flex-direction:column; gap:15px;">
-                <div>
-                    <label style="color:rgba(255,255,255,0.5); font-size:11px;">Judul Notifikasi</label>
-                    <input type="text" name="judul_notif" placeholder="Misal: Undangan Seminar AI" class="form-input" required>
-                </div>
-                <div>
-                    <label style="color:rgba(255,255,255,0.5); font-size:11px;">Pesan / Instruksi</label>
-                    <textarea name="pesan_notif" placeholder="Detail pesan notifikasi..." class="form-input" style="height: 100px; resize: none;" required></textarea>
-                </div>
-                
-                <div style="display:flex; gap:15px; margin-top:10px;">
-                    <button type="submit" style="flex:1; background:#00d2ff; color:#000; padding:12px; border-radius:12px; border:none; font-weight:800; cursor:pointer;">KIRIM (ALL)</button>
-                    <button type="button" onclick="toggleModal('notifModal')" style="flex:1; background:rgba(255,255,255,0.05); color:#fff; padding:12px; border-radius:12px; border:none; cursor:pointer;">BATAL</button>
-                </div>
-            </div>
-        </form>
-    </div>
-</div>
 
 <script>
     function toggleModal(id) {
@@ -413,7 +392,7 @@ include 'partials/sidebar.php';
         document.body.style.overflow = (modal.style.display === 'flex') ? 'hidden' : 'auto';
     }
 
-    function openEditModal(data) {
+    function openEditModal(data, status) {
         document.getElementById('edit_id').value = data.id_kegiatan;
         document.getElementById('edit_judul').value = data.judul;
         document.getElementById('edit_waktu_mulai').value = data.waktu_mulai ? data.waktu_mulai.substring(0, 16) : '';
@@ -423,6 +402,15 @@ include 'partials/sidebar.php';
         document.getElementById('edit_penanggung_jawab').value = data.penanggung_jawab || '';
         document.getElementById('edit_id_anggota').value = data.id_anggota || '';
         document.getElementById('hapus_btn').href = 'admin/kegiatan_action.php?action=hapus&id=' + data.id_kegiatan;
+
+        // Lock field jika kegiatan sudah mulai atau selesai
+        const isLocked = (status === 'Sedang Terlaksana' || status === 'Selesai');
+        const lockFields = ['edit_judul', 'edit_waktu_mulai', 'edit_waktu_selesai', 'edit_tempat', 'edit_deskripsi', 'edit_penanggung_jawab', 'edit_id_anggota'];
+        lockFields.forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.disabled = isLocked;
+        });
+        document.getElementById('edit_locked_banner').style.display = isLocked ? 'block' : 'none';
         
         const fotoContainer = document.getElementById('edit_foto_container');
         if (data.cover) {
@@ -438,10 +426,58 @@ include 'partials/sidebar.php';
         toggleModal('editKegiatanModal');
     }
 
-    function openNotifModal(id_kegiatan, judul) {
-        document.getElementById('notif_id_kegiatan').value = id_kegiatan;
-        document.getElementById('notif_judul_kegiatan').innerText = judul;
-        toggleModal('notifModal');
+    // ── Validasi minlength real-time ──────────────────────────────────────
+    function setupMinLength(inputId, errId, min) {
+        const el = document.getElementById(inputId);
+        const err = document.getElementById(errId);
+        if (!el || !err) return;
+        function check() {
+            const len = el.value.trim().length;
+            err.style.display = (len > 0 && len < min) ? 'block' : 'none';
+        }
+        el.addEventListener('input', check);
+        el.addEventListener('blur', check);
+    }
+
+    // Modal Tambah
+    setupMinLength('add_judul',     'add_judul_err',     10);
+    setupMinLength('add_tempat',    'add_tempat_err',    10);
+    setupMinLength('add_deskripsi', 'add_deskripsi_err', 25);
+
+    // Modal Edit
+    setupMinLength('edit_judul',     'edit_judul_err',     10);
+    setupMinLength('edit_tempat',    'edit_tempat_err',    10);
+    setupMinLength('edit_deskripsi', 'edit_deskripsi_err', 25);
+
+    // Cegah submit jika belum memenuhi minlength
+    document.querySelectorAll('#addKegiatanModal form, #editKegiatanModal form').forEach(function(form) {
+        form.addEventListener('submit', function(e) {
+            var isEdit = form.closest('#editKegiatanModal') !== null;
+            var prefix = isEdit ? 'edit' : 'add';
+            var checks = [
+                { id: prefix + '_judul',     errId: prefix + '_judul_err',     min: 10 },
+                { id: prefix + '_tempat',    errId: prefix + '_tempat_err',    min: 10 },
+                { id: prefix + '_deskripsi', errId: prefix + '_deskripsi_err', min: 25 },
+            ];
+            var valid = true;
+            checks.forEach(function(c) {
+                var el  = document.getElementById(c.id);
+                var err = document.getElementById(c.errId);
+                if (!el || !err) return;
+                var len = el.value.trim().length;
+                if (len > 0 && len < c.min) {
+                    err.style.display = 'block';
+                    if (valid) el.focus();
+                    valid = false;
+                }
+            });
+            if (!valid) e.preventDefault();
+        });
+    });
+
+    // Bersihkan ?msg= dari URL tanpa reload (agar hilang saat refresh)
+    if (window.location.search.includes('msg=')) {
+        window.history.replaceState(null, '', window.location.pathname);
     }
 </script>
 

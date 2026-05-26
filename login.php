@@ -17,6 +17,7 @@ if (isset($_SESSION['user'])) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" type="image/jpeg" href="assets/img/logonakama.jpeg">
     <title>Login - HMJ TI Nakama</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -268,7 +269,7 @@ if (isset($_SESSION['user'])) {
                 <!-- ══════════ SCREEN 1 : EMAIL ══════════ -->
                 <div id="screen-email" class="otp-screen active">
                     <div class="login-header">
-                        <div class="login-logo">H</div>
+                        <img src="assets/img/logonakama.jpeg" style="width: 100px; height: 100px; border-radius: 12px; object-fit: cover;">
                         <h1 class="login-title">Selamat Datang</h1>
                         <p class="login-subtitle">Silakan login ke sistem HMJ TI Polije</p>
                     </div>

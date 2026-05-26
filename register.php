@@ -1,31 +1,41 @@
 <?php
-session_start(); 
+require_once 'includes/session_config.php';
 
+// 1. Harus login
 if (!isset($_SESSION['user'])) {
     header("Location: login.php");
     exit;
 }
 
+// 2. Hanya ketua yang boleh akses
 $role = $_SESSION['user']['role_derived'] ?? '';
 if ($role !== 'ketua') {
-    header("Location: index.php"); 
+    header("Location: anggota.php");
+    exit;
+}
+
+// 3. Blokir akses langsung via URL (harus dari dalam sistem)
+$referer = $_SERVER['HTTP_REFERER'] ?? '';
+$host    = $_SERVER['HTTP_HOST'] ?? '';
+if (empty($referer) || strpos($referer, $host) === false) {
+    header("Location: anggota.php");
     exit;
 }
 
 require_once 'classes/Database.php';
 require_once 'classes/Auth.php';
 
-$db = new Database();
+$db   = new Database();
 $conn = $db->conn;
 $auth = new Auth($conn);
 
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
-    $name = $_POST['name'] ?? '';
-    $email = $_POST['email'] ?? '';
+    $name     = $_POST['name']     ?? '';
+    $email    = $_POST['email']    ?? '';
     $password = $_POST['password'] ?? '';
 
     if ($auth->register($name, $email, $password)) {
-        header("Location: login.php");
+        header("Location: anggota.php");
         exit;
     } else {
         $error = "Pendaftaran gagal. Email sudah terdaftar.";

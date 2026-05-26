@@ -1,21 +1,21 @@
 </main> </div> <footer class="site-footer" style="padding: 40px 0; border-top: 1px solid var(--glass-border); text-align: center; margin-top: auto;">
     <div style="margin-bottom: 10px;">
         <span style="color: var(--text-muted); font-size: 0.9rem;">Copyright © 2026 </span>
-        <span style="color: #fff; font-weight: 700; font-size: 0.9rem;">HMJ TI Polije - Nakama Edition.</span>
+        <span style="color: #0f172a; font-weight: 800; font-size: 0.9rem;">HMJ TI Polije - Nakama Edition.</span>
     </div>
-    <div style="color: var(--text-muted); font-size: 0.8rem; margin-bottom: 25px; letter-spacing: 0.5px;">
+    <div style="color: var(--text-muted); font-size: 0.8rem; margin-bottom: 25px; letter-spacing: 0.5px; font-weight: 500;">
         Jurusan Teknologi Informasi - Politeknik Negeri Jember.
     </div>
 
     <div style="display: flex; flex-direction: column; gap: 10px; align-items: center;">
-        <div id="digital-clock" style="color: #00d2ff; font-family: 'Space Mono', monospace; font-size: 1.4rem; font-weight: 800; letter-spacing: 2px; text-shadow: 0 0 10px rgba(0, 210, 255, 0.3);">
+        <div id="digital-clock" style="color: #0077ff; font-family: 'Space Mono', monospace; font-size: 1.4rem; font-weight: 900; letter-spacing: 2px; text-shadow: 0 0 12px rgba(0, 119, 255, 0.4);">
             <?= date('H.i.s') ?> WIB
         </div>
         
-        <div style="display: flex; align-items: center; gap: 8px; font-size: 0.75rem; color: #fff; font-weight: 600;">
+        <div style="display: flex; align-items: center; gap: 8px; font-size: 0.75rem; color: #0f172a; font-weight: 700;">
             <span style="color: var(--text-muted);">System Status:</span>
-            <span style="color: #00FF66; display: flex; align-items: center; gap: 5px;">
-                <span style="width: 8px; height: 8px; background: #00FF66; border-radius: 50%; display: inline-block; box-shadow: 0 0 8px #00FF66;"></span>
+            <span style="color: #059669; display: flex; align-items: center; gap: 5px; font-weight: 800;">
+                <span style="width: 8px; height: 8px; background: #00e676; border-radius: 50%; display: inline-block; box-shadow: 0 0 10px rgba(0, 230, 118, 0.8);"></span>
                 Online
             </span>
         </div>
@@ -25,7 +25,7 @@
 <script src="assets/js/templatemo-glass-admin-script.js"></script>
 
 <script>
-    // 1. Script Jam Digital biar jalan Real-time
+    // Script Jam Digital biar jalan Real-time
     function updateClock() {
         const now = new Date();
         const h = String(now.getHours()).padStart(2, '0');
@@ -35,7 +35,8 @@
     }
     setInterval(updateClock, 1000);
 
-    // 2. Logika Hamburger Menu (Safe Mode)
+    // Logika Hamburger Menu 
+    
     document.addEventListener('DOMContentLoaded', function() {
         const toggleBtn = document.getElementById('sidebar-toggle');
         const sidebar = document.getElementById('sidebar');

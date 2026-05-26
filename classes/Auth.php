@@ -15,10 +15,10 @@ class Auth {
 
         // SELECT * FROM v_login tidak ada kolom email, jadi kita JOIN ke anggota
         $stmt = $this->conn->prepare("
-            SELECT v.*, a.email 
+            SELECT v.*, a.email, a.status_keanggotaan 
             FROM v_login v
             JOIN anggota a ON v.id_anggota = a.id_anggota
-            WHERE a.email=? OR v.username=?
+            WHERE (a.email=? OR v.username=?) AND a.status_keanggotaan != 'Alumni'
         ");
         $stmt->bind_param("ss", $identifier, $identifier);
         $stmt->execute();
@@ -85,7 +85,7 @@ class Auth {
     public function findByEmail(string $email): ?array {
         $email = trim($email);
         $stmt = $this->conn->prepare("
-            SELECT v.*, a.email 
+            SELECT v.*, a.email, a.status_keanggotaan 
             FROM v_login v
             JOIN anggota a ON v.id_anggota = a.id_anggota
             WHERE a.email = ?

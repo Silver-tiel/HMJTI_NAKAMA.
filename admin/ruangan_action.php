@@ -93,7 +93,7 @@ if (isset($_POST['tambah_ruangan'])) {
             //                 ^^^^^^^^ s-i-i-i-i-i-i-s = 8 ✓
             if (!$stmt->execute()) throw new Exception("Execute failed: " . $stmt->error);
             $stmt->close();
-            header("location:../peminjaman.php?msg=success");
+            header("location:../peminjaman.php?msg=ruangan_added");
             exit();
         }
 
